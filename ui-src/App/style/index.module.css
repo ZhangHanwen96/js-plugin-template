@@ -1,0 +1,15 @@
+.appWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.appWrapper .row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.appWrapper .thumbnail {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+}
