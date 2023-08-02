@@ -1,3 +1,56 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  padding: 0;
+  margin: 0;
+}
+
+.gradient {
+  background:
+    linear-gradient(90deg, #8d8d8d 50%, transparent 0) repeat-x,
+    linear-gradient(90deg, #8d8d8d 50%, transparent 0) repeat-x,
+    linear-gradient(0deg, #8d8d8d 50%, transparent 0) repeat-y,
+    linear-gradient(0deg, #8d8d8d 50%, transparent 0) repeat-y;
+  background-size:
+    5px 1px,
+    5px 1px,
+    1px 5px,
+    1px 5px;
+  background-position:
+    0 0,
+    0 100%,
+    0 0,
+    100% 0;
+  cursor: pointer;
+
+  &:hover {
+    animation: linearGradientMove 0.3s infinite linear;
+  }
+}
+
+@keyframes linearGradientMove {
+  100% {
+    background-position:
+      4px 0,
+      -4px 100%,
+      0 -4px,
+      100% 4px;
+  }
+}
+
+.striped {
+  background-color: #e879f91a;
+  background-image: linear-gradient(
+    135deg,
+    #d946ef80 10%,
+    #0000 0,
+    #0000 50%,
+    #d946ef80 0,
+    #d946ef80 60%,
+    #0000 0,
+    #0000
+  );
+  background-size: 7.07px 7.07px;
+}
