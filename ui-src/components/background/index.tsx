@@ -1,92 +1,120 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import React, { useRef, useState } from 'react'
-import { useMemoizedFn, useMount } from 'ahooks'
+import { useMemoizedFn, useMount, useUnmountedRef } from 'ahooks'
 import { usePluginStore } from '../../store'
 import clx from 'classnames'
+import { Rect } from '@/interface'
+import {
+  absolutePositionToPercent,
+  percentPositionToAbsolute
+} from '@/utils/position'
 
-let isMoving = false
+let isDraging = false
 let isResizing = false
 
 let startOrigin = {
   x: 0,
   y: 0
 }
-interface Rect {
-  x: number
-  y: number
-  height: number
-  width: number
-}
 
-const DEFAULT_INSET = {
-  left: 0,
-  top: 0,
-  right: 0,
-  bottom: 0
-}
+let lastRect: Rect
 
-let lastRect: any
-
-/**
- * @description transform absolute position to percent position
- *
- */
-const absolutePositionToPercent = (targetRect: Rect, containerRect: Rect) => {
-  const leftP = targetRect.x / containerRect.width
-  const topP = targetRect.y / containerRect.height
-  const widthP = targetRect.width / containerRect.width
-  const heightP = targetRect.height / containerRect.height
-  return {
-    left: leftP,
-    top: topP,
-    width: widthP,
-    height: heightP
-  }
-}
-
-const percentPositionToAbsolute = (targetRect: Rect, containerRect: Rect) => {
-  const left = targetRect.x * containerRect.width
-  const top = targetRect.y * containerRect.height
-  const width = targetRect.width * containerRect.width
-  const height = targetRect.height * containerRect.height
-  return {
-    left,
-    top,
-    width,
-    height
-  }
+export const rectBoxRef = {
+  current: undefined
+} as {
+  current: Rect | undefined
 }
 
 // plugin -> absolutePositionToPercent(targetRect, pluginContainerRect)
 // -> percentPositionToAbsolute(targetRect, editorContainerRect) -> editor
 
 const Background = () => {
+  const containerRef = useRef<HTMLDivElement>(null)
   const posterBgRef = useRef<HTMLDivElement>(null)
   const rectWrapperRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLDivElement>(null)
-  //   const scale = usePluginStore.use.scale()
-  const [rectBox, setRectBox] = useState<Rect>({
-    x: 50,
-    y: 100,
-    height: 80,
-    width: 150
+
+  const rectBox = usePluginStore.use.rectBox()
+  const inset = usePluginStore.use.inset()
+  const setRectBox = usePluginStore.use.setRectBox()
+  const setInset = usePluginStore.use.setInset()
+
+  const [imageNode, setImageNode] = useState<{ thumbSrc: string }>()
+
+  // const insetRef = useRef<typeof DEFAULT_INSET>()
+  const mounted = useRef(false)
+  if (!mounted.current) {
+    rectBoxRef.current = rectBox
+  }
+  useMount(() => {
+    mounted.current = true
   })
 
-  const [inset, setInset] = useState<typeof DEFAULT_INSET>(DEFAULT_INSET)
-  const insetRef = useRef<typeof DEFAULT_INSET>()
-  insetRef.current = inset
-  const positionRef = useRef<Rect>(rectBox)
+  useMount(() => {
+    let handler: any
+    window.addEventListener(
+      'message',
+      (handler = (e: MessageEvent<any>) => {
+        const pluginMessage = e.data.pluginMessage
+        if (!pluginMessage) return
+        if (pluginMessage?.requestId) {
+          return
+        }
+
+        const { type, payload } = pluginMessage || {}
+        if (type == 'syncEditorToPlugin') {
+          if (!posterBgRef.current) return
+          const pRect = payload
+          const _containerRect = posterBgRef.current?.getBoundingClientRect()
+          const containerRect: Rect = {
+            x: 0,
+            y: 0,
+            width: _containerRect.width,
+            height: _containerRect.height
+          }
+          const rect = percentPositionToAbsolute(pRect, containerRect)
+          // consider inset
+          const inset = usePluginStore.getState().inset
+          const _rect = {
+            x: rect.x - inset.left,
+            y: rect.y - inset.top,
+            width: rect.width + inset.left + inset.right,
+            height: rect.height + inset.top + inset.bottom
+          }
+          setRectBox(_rect)
+          rectBoxRef.current = _rect
+        }
+        if (type === 'resetImage') {
+          const url = (payload.thumbSrc = URL.createObjectURL(
+            new Blob([payload.thumb], { type: 'image/png' })
+          ))
+          setTimeout(() => {
+            URL.revokeObjectURL(url)
+          }, 20_000)
+          setImageNode(payload)
+        }
+      })
+    )
+    return () => {
+      window.removeEventListener('message', handler)
+    }
+  })
 
   const handleWrapperMouseDown = useMemoizedFn(
     (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-      isMoving = true
+      isDraging = true
       startOrigin = {
         x: e.clientX,
         y: e.clientY
       }
       bindEvents()
 
+      const oldRect: Rect = rectBox
+      let latestRect: Rect
+
       function wrapperMove(e: MouseEvent) {
-        if (!isMoving || !rectWrapperRef.current) return
+        if (!isDraging || !rectWrapperRef.current) return
+
         const { clientX, clientY } = e
 
         const offset = {
@@ -94,28 +122,38 @@ const Background = () => {
           y: clientY - startOrigin.y
         }
 
-        setRectBox((pre) => ({
-          ...pre,
-          x: positionRef.current.x + offset.x,
-          y: positionRef.current.y + offset.y
-        }))
+        setRectBox((pre) => {
+          latestRect = {
+            ...pre,
+            x: oldRect.x + offset.x,
+            y: oldRect.y + offset.y
+          }
+          return latestRect
+        })
       }
 
       function wrapperMouseUp(e: MouseEvent) {
-        isMoving = false
-        const { clientX, clientY } = e
-        const offset = {
-          x: clientX - startOrigin.x,
-          y: clientY - startOrigin.y
-        }
-        positionRef.current = {
-          x: positionRef.current.x + offset.x,
-          y: positionRef.current.y + offset.y,
-          height: positionRef.current.height,
-          width: positionRef.current.width
+        unbindEvents()
+        isDraging = false
+
+        if (latestRect) {
+          rectBoxRef.current = latestRect
         }
 
-        unbindEvents()
+        // sync rect to editor
+        const pRect = absolutePositionToPercent(
+          rectBoxRef.current,
+          posterBgRef.current?.getBoundingClientRect() as DOMRect
+        )
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: 'syncPlugintoEditor',
+              payload: pRect
+            }
+          },
+          '*'
+        )
       }
 
       function unbindEvents() {
@@ -133,9 +171,17 @@ const Background = () => {
   useMount(() => {
     if (!posterBgRef.current) return
     const rect = posterBgRef.current.getBoundingClientRect()
+
+    const height = posterBgRef.current.style.height
+    posterBgRef.current.style.height = '100%'
+    // force reflow
+    posterBgRef.current.offsetHeight
+    const { height: maxHeight } = posterBgRef.current.getBoundingClientRect()
+    posterBgRef.current.style.height = height
+
     usePluginStore
       .getState()
-      .calculateScale({ height: rect.height, width: rect.width })
+      .calculateScale({ height: maxHeight, width: rect.width })
   })
 
   const handleResize = useMemoizedFn(
@@ -168,7 +214,7 @@ const Background = () => {
 
         const newInset: any = {}
         const { clientX, clientY } = e
-        const wrapperRectInfo = rectWrapperRef.current.getBoundingClientRect()
+        // const wrapperRectInfo = rectWrapperRef.current.getBoundingClientRect()
 
         const clampedX = Math.max(
           posterRect.x,
@@ -185,7 +231,7 @@ const Background = () => {
           y: clampedY - startPoint.y
         }
 
-        let newRect: Rect = {} as any
+        let newRect = {} as Rect
         const __rect = {} as Rect & { deltaX?: number; deltaY?: number }
         const relativeImageRect: Omit<DOMRect, 'toJSON'> = {
           x: imageRect.x - posterRect.x,
@@ -214,14 +260,13 @@ const Background = () => {
 
             if (clientY < posterRect.y || clientY > imageRect.top) {
               if (clientY < posterRect.y) {
-                const height =
-                  positionRef.current.height + positionRef.current.y
+                const height = rectBoxRef.current.height + rectBoxRef.current.y
                 __rect.y = 0
                 __rect.height = height
               } else {
                 __rect.height =
-                  positionRef.current.y +
-                  positionRef.current.height -
+                  rectBoxRef.current.y +
+                  rectBoxRef.current.height -
                   relativeImageRect.top
                 __rect.y = relativeImageRect.top
               }
@@ -229,18 +274,18 @@ const Background = () => {
             break
           case 'right':
             if (clientX > posterRect.right) {
-              __rect.width = posterRect.width - positionRef.current.x
+              __rect.width = posterRect.width - rectBoxRef.current.x
             } else if (clientX < imageRect.right) {
-              __rect.width = relativeImageRect.right - positionRef.current.x
+              __rect.width = relativeImageRect.right - rectBoxRef.current.x
             }
 
             break
           case 'bottom':
             if (clientY > posterRect.bottom || clientY < imageRect.bottom) {
               if (clientY > posterRect.bottom) {
-                __rect.height = posterRect.height - positionRef.current.y
+                __rect.height = posterRect.height - rectBoxRef.current.y
               } else {
-                __rect.height = relativeImageRect.bottom - positionRef.current.y
+                __rect.height = relativeImageRect.bottom - rectBoxRef.current.y
               }
             }
             break
@@ -248,36 +293,34 @@ const Background = () => {
             if (clientX < posterRect.x || clientX > imageRect.left) {
               if (clientX < posterRect.x) {
                 __rect.x = 0
-                __rect.width = positionRef.current.x + positionRef.current.width
+                __rect.width = rectBoxRef.current.x + rectBoxRef.current.width
               } else {
                 __rect.x = relativeImageRect.left
                 __rect.width =
-                  positionRef.current.x +
-                  positionRef.current.width -
+                  rectBoxRef.current.x +
+                  rectBoxRef.current.width -
                   relativeImageRect.left
               }
             }
             break
         }
 
-        // if (!shouldUpdate) return
-
         if (dir === 'top') {
           newRect = {
-            x: positionRef.current.x,
-            y: positionRef.current.y + offset.y,
-            width: positionRef.current.width,
-            height: positionRef.current.height - offset.y,
+            x: rectBoxRef.current.x,
+            y: rectBoxRef.current.y + offset.y,
+            width: rectBoxRef.current.width,
+            height: rectBoxRef.current.height - offset.y,
             ...__rect
           }
           newInset.top = Math.abs(newRect.y - relativeImageRect.top)
         }
         if (dir === 'right') {
           newRect = {
-            x: positionRef.current.x,
-            y: positionRef.current.y,
-            width: positionRef.current.width + offset.x,
-            height: positionRef.current.height,
+            x: rectBoxRef.current.x,
+            y: rectBoxRef.current.y,
+            width: rectBoxRef.current.width + offset.x,
+            height: rectBoxRef.current.height,
             ...__rect
           }
 
@@ -288,10 +331,10 @@ const Background = () => {
         }
         if (dir === 'bottom') {
           newRect = {
-            x: positionRef.current.x,
-            y: positionRef.current.y,
-            width: positionRef.current.width,
-            height: positionRef.current.height + offset.y,
+            x: rectBoxRef.current.x,
+            y: rectBoxRef.current.y,
+            width: rectBoxRef.current.width,
+            height: rectBoxRef.current.height + offset.y,
             ...__rect
           }
           newInset.bottom = Math.abs(
@@ -300,10 +343,10 @@ const Background = () => {
         }
         if (dir === 'left') {
           newRect = {
-            x: positionRef.current.x + offset.x,
-            y: positionRef.current.y,
-            width: positionRef.current.width - offset.x,
-            height: positionRef.current.height,
+            x: rectBoxRef.current.x + offset.x,
+            y: rectBoxRef.current.y,
+            width: rectBoxRef.current.width - offset.x,
+            height: rectBoxRef.current.height,
             ...__rect
           }
           newInset.left = Math.abs(newRect.x - relativeImageRect.left)
@@ -323,7 +366,7 @@ const Background = () => {
 
       const onMouseUp = (e: MouseEvent) => {
         isResizing = false
-        positionRef.current = lastRect
+        rectBoxRef.current = lastRect
 
         unbindEvents()
       }
@@ -361,7 +404,6 @@ const Background = () => {
       return {
         left: dir === 'right' ? `calc(100% - ${size}px)` : undefined,
         right: dir === 'left' ? `calc(100% - ${size}px)` : undefined,
-
         height: '100%',
         width: `${size}px`
       }
@@ -372,7 +414,8 @@ const Background = () => {
       <div
         className={clx(
           'resize-handler absolute w-full hover:bg-blue-700',
-          isCurrentActive && 'bg-blue-500'
+          isCurrentActive && 'bg-blue-400',
+          'group-hover:bg-blue-700'
         )}
         dir={dir}
         style={{
@@ -386,18 +429,23 @@ const Background = () => {
     )
   })
 
+  const editorPoster = usePluginStore.use.poster?.()
+  const posterRatio = editorPoster
+    ? editorPoster.width / editorPoster.height
+    : undefined
+  const isHorizontal = posterRatio ? posterRatio > 1 : false
+
   return (
-    <div className="w-full bg-slate-200">
+    <div className="h-full w-full bg-slate-200 px-8 py-4" ref={containerRef}>
       <div
         ref={posterBgRef}
-        className="poster relative mx-auto w-4/5 overflow-hidden bg-slate-500/50"
+        className="poster relative m-auto overflow-hidden bg-slate-500/50"
         style={{
-          aspectRatio: 16 / 9
+          width: posterRatio ? (isHorizontal ? '100%' : undefined) : undefined,
+          height: posterRatio ? (isHorizontal ? undefined : '100%') : undefined,
+          aspectRatio: posterRatio
         }}
       >
-        {/* <div className="resize-handler" dir="e"></div>
-        <div className="resize-handler" dir="s"></div>
-        <div className="resize-handler" dir="w"></div> */}
         <div
           className="striped absolute"
           style={{
@@ -410,7 +458,7 @@ const Background = () => {
         <div
           ref={rectWrapperRef}
           onMouseDown={handleWrapperMouseDown}
-          className="rect-wrapper gradient absolute bg-red-200"
+          className="rect-wrapper gradient group absolute bg-red-200"
           style={{
             left: rectBox.x,
             top: rectBox.y,
@@ -418,17 +466,20 @@ const Background = () => {
             width: rectBox.width
           }}
         >
-          {/* <div className=""> */}
           <div
             ref={imageRef}
             className="absolute bg-green-500"
             style={{
-              ...inset
+              ...inset,
+              backgroundImage: imageNode?.thumbSrc
+                ? `url(${imageNode?.thumbSrc})`
+                : undefined,
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
             }}
           ></div>
           {resizeCursors}
-
-          {/* </div> */}
         </div>
       </div>
     </div>

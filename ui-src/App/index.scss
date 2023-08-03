@@ -6,13 +6,16 @@ body {
   padding: 0;
   margin: 0;
 }
+div {
+  box-sizing: border-box;
+}
 
 .gradient {
   background:
-    linear-gradient(90deg, #8d8d8d 50%, transparent 0) repeat-x,
-    linear-gradient(90deg, #8d8d8d 50%, transparent 0) repeat-x,
-    linear-gradient(0deg, #8d8d8d 50%, transparent 0) repeat-y,
-    linear-gradient(0deg, #8d8d8d 50%, transparent 0) repeat-y;
+    linear-gradient(90deg, #ffffff 50%, transparent 0) repeat-x,
+    linear-gradient(90deg, #ffffff 50%, transparent 0) repeat-x,
+    linear-gradient(0deg, #ffffff 50%, transparent 0) repeat-y,
+    linear-gradient(0deg, #ffffff 50%, transparent 0) repeat-y;
   background-size:
     5px 1px,
     5px 1px,
@@ -24,10 +27,11 @@ body {
     0 0,
     100% 0;
   cursor: pointer;
+  animation: linearGradientMove 0.3s infinite linear;
 
-  &:hover {
-    animation: linearGradientMove 0.3s infinite linear;
-  }
+  // &:hover {
+  //   animation: linearGradientMove 0.3s infinite linear;
+  // }
 }
 
 @keyframes linearGradientMove {

@@ -5,7 +5,12 @@
     "jsxFragmentFactory": "jsDesign.widget.Fragment",
     "target": "es6",
     "lib": ["es6"],
+    "module": "ESNext",
+    "moduleResolution": "Node",
     // "strict": true,
-    "typeRoots": ["../node_modules/@jsdesigndeveloper"]
+    "typeRoots": ["../node_modules/@jsdesigndeveloper"],
+    "paths": {
+      "@/*": ["../ui-src/*"]
+    }
   }
 }
