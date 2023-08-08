@@ -6,6 +6,10 @@ import { immer } from 'zustand/middleware/immer'
 import { createSelectors } from './createSelectors'
 import Pubsub from '../utils/pubsub'
 import { Rect } from '@/interface'
+import { toFixed2 } from '@/utils/position'
+import { uuid } from '@/utils/uuid'
+import { postMessage } from '@/utils'
+import { rectBoxRef } from '@/components/background'
 
 export interface Poster {
   width: number
@@ -33,6 +37,10 @@ type State = {
   rectWrapper?: ImageRectWrapper
   rectBox: Rect
   inset: typeof DEFAULT_INSET
+  imageSrc?: string
+  imageFile?: File
+  imageHistory: string[]
+  __remount_updater: number
 }
 
 type Actions = {
@@ -45,9 +53,12 @@ type Actions = {
   }) => Promise<void>
   setRectBox: (rect: React.SetStateAction<Rect>) => void
   setInset: (rect: React.SetStateAction<typeof DEFAULT_INSET>) => void
+  addImageHistory: (urls: string[] | undefined) => void
+  setImageSrc: (src: string) => void
+  resetBoundary: () => void
 }
 
-const eventPubsub = new Pubsub()
+export const eventPubsub = new Pubsub()
 
 interface MessageData {
   pluginMessage: {
@@ -56,7 +67,6 @@ interface MessageData {
     payload: any
   }
 }
-
 const getInitData = (
   width: number,
   height: number,
@@ -69,54 +79,91 @@ const getInitData = (
   }
 ) => {
   const posterRatio = poster.width / poster.height
+  const containerRatio = width / height
   const isHorizontal = posterRatio > 1
 
-  const scale = isHorizontal ? width / poster.width : height / poster.height
+  let scale = isHorizontal ? width / poster.width : height / poster.height
 
-  return {
+  if (containerRatio > posterRatio) {
+    scale = height / poster.height
+  }
+
+  const result = {
     rectWrapper: imageWrapperRect,
     poster,
     scale,
     rectBox: {
-      height: imageWrapperRect.height * scale,
-      width: imageWrapperRect.width * scale,
-      x: imageWrapperRect.x * scale,
-      y: imageWrapperRect.y * scale
+      height: toFixed2(imageWrapperRect.height * scale),
+      width: toFixed2(imageWrapperRect.width * scale),
+      x: toFixed2(imageWrapperRect.x * scale),
+      y: toFixed2(imageWrapperRect.y * scale)
     }
   }
-}
-
-const genUUid = () => {
-  return Math.ceil(Math.random() * 10000) + ''
+  // console.log(result, 'result')
+  return result
 }
 
 // will be updated
 // HACK: ???
-let lastWidth = 520
-let lastHeight = 460
+let maxPosterWidth = 520
+let maxPosterHeight = 460 - 80 - 120
 
 window.addEventListener('message', (e: MessageEvent<MessageData>) => {
   const pluginMessage = e.data.pluginMessage
   if (!pluginMessage) return
-  if (!pluginMessage?.requestId) {
-    if (pluginMessage?.type === 'reInitialize') {
-      const payload = pluginMessage.payload
-      if (!payload) {
-        usePluginStore.setState({
-          rectWrapper: undefined,
-          poster: undefined,
-          scale: 1
-        })
-        return
-      }
-      const initData = getInitData(lastWidth, lastHeight, pluginMessage.payload)
+  console.log(
+    '%c[IFRAME] type: ' + pluginMessage?.type,
+    'color: green; font-weight: bold; font-size: 16px'
+  )
+  if (pluginMessage?.type === 'reInitialize') {
+    const payload = pluginMessage.payload
+    if (!payload) {
       usePluginStore.setState({
-        ...initData,
-        inset: DEFAULT_INSET
+        rectWrapper: undefined,
+        poster: undefined,
+        scale: 1
       })
+      return
     }
-  } else {
-    const { requestId, payload } = pluginMessage
+    const initData = getInitData(
+      maxPosterWidth,
+      maxPosterHeight,
+      pluginMessage.payload
+    )
+    usePluginStore.setState({
+      ...initData,
+      inset: DEFAULT_INSET
+    })
+  } else if (pluginMessage.type === 'currentpagechange') {
+    if (window.confirm('监测到页面切换，确定清空当前插件的历史吗?')) {
+      // TODO: clear all
+      usePluginStore.setState({
+        imageSrc: undefined,
+        inset: DEFAULT_INSET,
+        __remount_updater: usePluginStore.getState().__remount_updater + 1
+        // rectBox: {
+        //   height: 0,
+        //   width: 0,
+        //   x: 0,
+        //   y: 0
+        // },
+      })
+      parent.postMessage(
+        {
+          pluginMessage: {
+            requestId: pluginMessage.requestId,
+            payload: {
+              confirm: true
+            }
+          }
+        },
+        '*'
+      )
+    }
+  }
+
+  const { requestId, payload } = pluginMessage
+  if (requestId) {
     eventPubsub.notify(requestId, payload)
   }
 })
@@ -133,35 +180,23 @@ const _pluginStore = create(
           x: 0,
           y: 0
         },
+        __remount_updater: 0,
+        imageHistory: [],
+        imageSrc: undefined,
         poster: undefined,
         rectWrapper: undefined,
         async calculateScale({ width, height }) {
-          lastWidth = width
-          lastHeight = height
-
-          const requestId = genUUid()
-          parent.postMessage({
-            pluginMessage: {
-              type: 'getPosterAndWrapperRect',
-              requestId
-            }
-          })
-
-          const responsePromise = new Promise<{
+          maxPosterWidth = width
+          maxPosterHeight = height
+          const responsePromise = postMessage<{
             imageWrapperRect: ImageRectWrapper
             poster: Poster
-          } | null>((resolve, reject) => {
-            eventPubsub.once(requestId, (data) => {
-              resolve(data)
-            })
-            setTimeout(() => {
-              reject(new Error('timeout'))
-            }, 4000)
+          } | null>({
+            type: 'getPosterAndWrapperRect'
           })
 
           try {
             const r = await responsePromise
-            console.log('r: ', r)
             // meaning need to upload image
             if (!r) {
               set((state) => {
@@ -201,6 +236,36 @@ const _pluginStore = create(
           const result = typeof rect === 'function' ? rect(get().rectBox) : rect
           set((state) => {
             state.rectBox = result
+          })
+        },
+        setImageSrc(src) {
+          set((state) => {
+            state.imageSrc = src
+          })
+        },
+        addImageHistory(urls) {
+          set((state) => {
+            if (urls) {
+              state.imageHistory.push(...urls)
+            } else {
+              state.imageHistory.splice(0)
+            }
+          })
+        },
+        resetBoundary() {
+          const { rectBox, inset } = get()
+
+          const actualImageRect: Rect = {
+            x: rectBox.x + inset.left,
+            y: rectBox.y + inset.top,
+            width: rectBox.width - inset.left - inset.right,
+            height: rectBox.height - inset.top - inset.bottom
+          }
+
+          rectBoxRef.current = actualImageRect
+          set((state) => {
+            state.inset = DEFAULT_INSET
+            state.rectBox = actualImageRect
           })
         }
       }))

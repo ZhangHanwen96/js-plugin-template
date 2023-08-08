@@ -1,9 +1,10 @@
-import { isEqual } from 'lodash'
+import { isEqual, uniqueId } from 'lodash'
 import {
   absolutePositionToPercent,
   percentPositionToAbsolute
 } from '@/utils/position'
 import type { Rect } from '@/interface'
+import Pubsub from './pubsub'
 import { createBgRectangle, createNewFrame, findImageFill } from './util'
 
 export interface Poster {
@@ -22,7 +23,7 @@ export interface ImageRectWrapper {
 const IFRAME_WIDTH = 520
 const IFRAME_HEIGHT = 460 + 50
 
-jsDesign.showUI(__html__, {
+figma.showUI(__html__, {
   width: IFRAME_WIDTH,
   height: IFRAME_HEIGHT
 })
@@ -30,7 +31,7 @@ const HISTORY_KEY = 'tezign-history'
 
 const historyStorage = {
   get(pageId: string) {
-    const history = jsDesign.root.getPluginData(HISTORY_KEY)
+    const history = figma.root.getPluginData(HISTORY_KEY)
     try {
       return JSON.parse(history)[pageId]
     } catch (e) {
@@ -40,38 +41,46 @@ const historyStorage = {
   set(pageId: string, payload: any) {
     const history = historyStorage.get(pageId) || {}
     history[pageId] = payload
-    jsDesign.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
+    figma.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
   },
   delete(pageId: string) {
     const history = historyStorage.get(pageId)
     if (!history) return
     delete history[pageId]
-    jsDesign.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
+    figma.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
   }
 }
 
 const getPosterNode = () => {
-  return jsDesign.currentPage.findOne((node) => node.type === 'FRAME') as
+  return figma.currentPage.findOne((node) => node.type === 'FRAME') as
     | FrameNode
     | undefined
 }
 
 let posterNode: FrameNode | undefined
 
-const getPluginBgNode = () => {
-  return jsDesign.currentPage.findOne(
-    (node) => !!node.getPluginData('isBackground')
-  ) as RectangleNode | undefined
-}
-
 const getDefaultBgNode = () => {
-  return jsDesign.currentPage.findOne(
+  return figma.currentPage.findOne(
     (node) => node.name === '背景' && node.type === 'RECTANGLE'
   ) as RectangleNode | undefined
 }
 
+const getPluginBgNode = () => {
+  const pluginNode = figma.currentPage.findOne(
+    (node) => !!node.getPluginData('isBackground')
+  ) as RectangleNode | undefined
+  if (pluginNode) return pluginNode
+  return null
+
+  const defaultNode = getDefaultBgNode()
+  if (!defaultNode) return null
+  defaultNode.setPluginData('isBackground', 'true')
+  return pluginNode
+}
+
 let bgRectNode: RectangleNode | undefined
 let bgRectNodeRect: Rect
+let imageHash: string
 
 const initNodes = (resetRect = true) => {
   posterNode = getPosterNode()
@@ -83,6 +92,7 @@ const initNodes = (resetRect = true) => {
       width: bgRectNode.width,
       height: bgRectNode.height
     }
+    imageHash = (bgRectNode.fills[0] as ImagePaint)?.imageHash
   }
 }
 
@@ -93,9 +103,11 @@ const resetImage = async () => {
   const imagePaint = findImageFill(bgRectNode)
   if (!imagePaint) return
   try {
-    const uint8 = await bgRectNode.exportAsync()
+    // const uint8 = await bgRectNode.exportAsync()
+    const imageNode = jsDesign.getImageByHash(imagePaint.imageHash)
+    const uint8 = await imageNode.getBytesAsync()
     const { id, name, width, height } = bgRectNode as RectangleNode
-    jsDesign.ui.postMessage({
+    figma.ui.postMessage({
       type: 'resetImage',
       payload: {
         id,
@@ -110,25 +122,63 @@ const resetImage = async () => {
   }
 }
 
-const reInitialize = () => {
+const reInitialize = (requestId?: string) => {
   initNodes()
   const payload = getPosterAndWrapperRect()
-  jsDesign.ui.postMessage({
+  figma.ui.postMessage({
     type: 'reInitialize',
-    payload
+    payload,
+    requestId
   })
 }
 
-jsDesign.on('currentpagechange', () => {
-  reInitialize()
-  resetImage()
+const eventPubsub = new Pubsub()
+
+const postMessage = async (pluginMessage: any) => {
+  const requestId = uniqueId()
+  jsDesign.ui.postMessage(
+    {
+      ...pluginMessage,
+      requestId
+    },
+    {
+      origin: '*'
+    }
+  )
+  const responsePromise = new Promise((resolve, reject) => {
+    eventPubsub.once(requestId, (data) => {
+      resolve(data)
+    })
+    setTimeout(() => {
+      reject(new Error('timeout'))
+    }, 4000)
+  })
+
+  return responsePromise
+}
+
+figma.on('currentpagechange', async () => {
+  try {
+    const response = await postMessage({
+      type: 'currentpagechange'
+    })
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    if (response?.confirm) {
+      // TODO: ask iframe for confirmation
+      reInitialize()
+      resetImage()
+    }
+  } catch (error) {
+    console.error(error)
+  }
 })
 
 // sync editor change to plugin
-jsDesign.on('selectionchange', () => {
+figma.on('selectionchange', () => {
   initNodes(false)
   if (!posterNode || !bgRectNode) {
-    jsDesign.ui.postMessage({
+    figma.ui.postMessage({
       type: 'reInitialize',
       payload: null
     })
@@ -141,22 +191,29 @@ jsDesign.on('selectionchange', () => {
     width: bgRectNode.width,
     height: bgRectNode.height
   }
-  // const imageFill = findImageFill(bgRectNode)
 
-  if (isEqual(wrapperRect, bgRectNodeRect)) return
+  if (!isEqual(wrapperRect, bgRectNodeRect)) {
+    const containerRect: Rect = {
+      x: 0,
+      y: 0,
+      width: posterNode.width,
+      height: posterNode.height
+    }
+    const pRect = absolutePositionToPercent(wrapperRect, containerRect)
 
-  const containerRect: Rect = {
-    x: 0,
-    y: 0,
-    width: posterNode.width,
-    height: posterNode.height
+    figma.ui.postMessage({
+      type: 'syncEditorToPlugin',
+      payload: pRect
+    })
   }
-  const pRect = absolutePositionToPercent(wrapperRect, containerRect)
 
-  jsDesign.ui.postMessage({
-    type: 'syncEditorToPlugin',
-    payload: pRect
-  })
+  const currentImageHash = (bgRectNode.fills[0] as ImagePaint)?.imageHash
+  if (currentImageHash && imageHash !== currentImageHash) {
+    imageHash = currentImageHash
+    // resetImage()
+  }
+
+  initNodes()
 })
 
 /**
@@ -172,9 +229,15 @@ const syncPluginToEditor = (pRect: Rect) => {
     y: 0
   }
   const rect = percentPositionToAbsolute(pRect, posterRect)
-  Reflect.ownKeys(rect).forEach((key) => {
-    bgRectNode[key] = rect[key]
-  })
+
+  bgRectNode.x = rect.x
+  bgRectNode.y = rect.y
+  bgRectNode.resize(rect.width, rect.height)
+  // avoid next [syncEditorToPlugin] triggered by selectionchane
+  // HACK
+  bgRectNodeRect = {
+    ...rect
+  }
 }
 
 function getPosterAndWrapperRect() {
@@ -199,7 +262,7 @@ function getPosterAndWrapperRect() {
 }
 
 const handleGetPosterAndWrapperRectMsg = (requestId: string) => {
-  jsDesign.ui.postMessage(
+  figma.ui.postMessage(
     {
       requestId,
       payload: getPosterAndWrapperRect()
@@ -222,13 +285,21 @@ const uploadImage = async (src: string) => {
 
   let rectangleNode = getPluginBgNode()
   if (!rectangleNode) {
-    rectangleNode = createBgRectangle()
+    // use default template node whose name is '背景'
+    // or create new one otherwise
+    const _default_node = getDefaultBgNode()
+    if (_default_node) {
+      rectangleNode = _default_node
+      rectangleNode.setPluginData('isBackground', 'true')
+    } else {
+      rectangleNode = createBgRectangle()
+    }
   }
 
   const res = await fetch(src)
   const arrayBuffer = await res.arrayBuffer()
   const int8Arr = new Uint8Array(arrayBuffer)
-  const img = jsDesign.createImage(int8Arr)
+  const img = figma.createImage(int8Arr)
 
   // 改变节点的填充即可
   rectangleNode.fills = [
@@ -238,27 +309,66 @@ const uploadImage = async (src: string) => {
   // half width, full height, centered
   rectangleNode.resize(posterNode.width / 2, posterNode.height)
   rectangleNode.x = (posterNode.width - posterNode.width / 2) / 2
+  rectangleNode.y = 0
   posterNode.appendChild(rectangleNode)
 
-  jsDesign.viewport.scrollAndZoomIntoView([rectangleNode])
+  figma.viewport.scrollAndZoomIntoView([rectangleNode])
+
+  jsDesign.currentPage.selection = [rectangleNode]
+
+  initNodes()
 }
 
 const handleFirstLoad = () => {
   reInitialize()
 }
 
-jsDesign.ui.onmessage = (msg) => {
+const updateImage = async ({
+  src,
+  rect: pRect
+}: {
+  src: string
+  rect: Rect
+}) => {
+  const posterNode = getPosterNode()
+  if (!posterNode) {
+    return
+  }
+  const rectangleNode = getPluginBgNode()
+  if (!rectangleNode) {
+    return
+  }
+
+  // sync size
+  syncPluginToEditor(pRect)
+
+  const res = await fetch(src)
+  const arrayBuffer = await res.arrayBuffer()
+  const int8Arr = new Uint8Array(arrayBuffer)
+  const img = figma.createImage(int8Arr)
+  rectangleNode.fills = [
+    { type: 'IMAGE', scaleMode: 'FILL', imageHash: img.hash }
+  ]
+
+  reInitialize()
+  // resetImage()
+}
+
+figma.ui.onmessage = (msg) => {
   const { type, requestId, payload } = msg
+  console.log(
+    '%c[MAIN] type: ' + type,
+    'color: blue; font-weight: bold; font-size: 16px'
+  )
   switch (type) {
     case 'firstLoad':
-      console.log('firstLoad')
       // iframe -> inited -> ok got you
       // -> iframe should require upload image
       handleFirstLoad()
       break
     case 'manualReInitialize':
-      reInitialize()
-      resetImage()
+      reInitialize(requestId)
+      // resetImage()
       break
     case 'getPosterAndWrapperRect':
       handleGetPosterAndWrapperRectMsg(requestId)
@@ -268,5 +378,11 @@ jsDesign.ui.onmessage = (msg) => {
       break
     case 'uploadImage':
       uploadImage(payload)
+      break
+    case 'updateImage':
+      updateImage(payload)
+      break
+    default:
+      requestId && eventPubsub.notify(requestId, payload)
   }
 }
