@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import reactRefresh from '@vitejs/plugin-react-refresh'
 import { viteSingleFile } from 'vite-plugin-singlefile'
+import { createStyleImportPlugin } from 'vite-plugin-style-import'
 import svgr from 'vite-plugin-svgr'
 import path from 'path'
 
@@ -10,6 +11,13 @@ export default defineConfig({
     port: 6003
   },
   root: './ui-src',
+  css: {
+    preprocessorOptions: {
+      less: {
+        javascriptEnabled: true
+      }
+    }
+  },
   plugins: [
     reactRefresh(),
     viteSingleFile(),
@@ -18,6 +26,17 @@ export default defineConfig({
       svgrOptions: {
         icon: true
       }
+    }),
+    createStyleImportPlugin({
+      libs: [
+        {
+          libraryName: '@tezign/tezign-ui',
+          esModule: true,
+          resolveStyle: (name) => {
+            return `@tezign/tezign-ui/es/${name}/style/index`
+          }
+        }
+      ]
     })
   ],
   build: {
@@ -35,8 +54,15 @@ export default defineConfig({
     }
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'ui-src')
-    }
+    alias: [
+      {
+        find: '@',
+        replacement: path.resolve(__dirname, 'ui-src')
+      },
+      {
+        find: /^~/,
+        replacement: ''
+      }
+    ]
   }
 })

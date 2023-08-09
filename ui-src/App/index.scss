@@ -45,14 +45,14 @@ div {
 }
 
 .striped {
-  background-color: #e879f91a;
+  background-color: #38bdf81a;
   background-image: linear-gradient(
     135deg,
-    #d946ef80 10%,
+    #0ea5e980 10%,
     #0000 0,
     #0000 50%,
-    #d946ef80 0,
-    #d946ef80 60%,
+    #0ea5e980 0,
+    #0ea5e980 60%,
     #0000 0,
     #0000
   );
@@ -60,7 +60,7 @@ div {
 }
 
 .mark-line {
-  background: #0ccfed;
+  background: #eb9f07;
   position: absolute;
   z-index: 1000;
 

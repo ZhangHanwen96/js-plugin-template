@@ -50,8 +50,7 @@ export const useMouseSelect = ({ handleEnd }: { handleEnd: any }) => {
         box.style.cssText =
           'position: absolute; \
                   box-sizing: border-box; \
-                  border: 1px solid var(--color-primary); \
-                  background-color: #33a0e44c; z-index: 1000'
+                  background-color: #33a0e44c; z-index: 1000; outline: none;'
         container.appendChild(box)
       }
 

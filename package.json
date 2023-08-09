@@ -19,7 +19,7 @@
   "author": "jsDesign",
   "license": "MIT License",
   "dependencies": {
-    "@tezign/tezign-ui": "^3.0.40",
+    "@tezign/tezign-ui": "^3.0.39",
     "classnames": "^2.3.2",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
@@ -30,6 +30,7 @@
     "@jsdesigndeveloper/plugin-typings": "^1.0.11",
     "@jsdesigndeveloper/widget-typings": "^1.0.3",
     "@tailwindcss/container-queries": "^0.1.1",
+    "@tezign/icons": "^1.1.42",
     "@types/lodash": "^4.14.196",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
@@ -39,6 +40,7 @@
     "ahooks": "^3.7.8",
     "autoprefixer": "^10.4.14",
     "concurrently": "^6.3.0",
+    "consola": "^3.2.3",
     "cssnano": "^6.0.1",
     "esbuild": "^0.13.5",
     "eslint": "^8.46.0",
@@ -48,6 +50,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-tailwindcss": "^3.13.0",
     "immer": "^10.0.2",
+    "less": "^4.2.0",
     "postcss": "^8.4.27",
     "postcss-import": "^15.1.0",
     "postcss-nested": "^6.0.1",
@@ -58,6 +61,7 @@
     "typescript": "^4.4.2",
     "vite": "^4.2.0",
     "vite-plugin-singlefile": "^0.5.1",
+    "vite-plugin-style-import": "^2.0.0",
     "vite-plugin-svgr": "^3.2.0"
   }
 }

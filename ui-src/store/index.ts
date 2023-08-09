@@ -7,7 +7,6 @@ import { createSelectors } from './createSelectors'
 import Pubsub from '../utils/pubsub'
 import { Rect } from '@/interface'
 import { toFixed2 } from '@/utils/position'
-import { uuid } from '@/utils/uuid'
 import { postMessage } from '@/utils'
 import { rectBoxRef } from '@/components/background'
 

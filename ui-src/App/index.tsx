@@ -1,13 +1,15 @@
 import React, { useMemo, useRef } from 'react'
 import './index.scss'
-import Background, { rectBoxRef } from '../components/background'
-import { DEFAULT_INSET, usePluginStore } from '@/store'
+import Background from '../components/background'
+import { usePluginStore } from '@/store'
 import { useMount } from 'ahooks'
+import { UploadOutlined } from '@tezign/icons'
 
 import { Accept, useDropzone } from 'react-dropzone'
-import { absolutePositionToPercent } from '@/utils/position'
 import { delay, postMessage } from '@/utils'
 import ImageList from '@/components/image-list'
+import { Alert, Button, Tabs, Upload } from '@tezign/tezign-ui'
+import { useExtraStore } from '@/store/extra'
 
 const upsplashUrl = 'https://source.unsplash.com/ACoZwVwjElU'
 export const getCustomImageUrl = (width: number, height: number) => {
@@ -55,19 +57,28 @@ export const image: Accept = {
   'image/svg+xml': ['.svg']
 }
 
+const TabPane = Tabs.TabPane
+
 const App: React.FC = () => {
   const rectWrapper = usePluginStore.use.rectWrapper?.()
-  const imageSrc = usePluginStore.use.imageSrc?.()
   const setImageSrc = usePluginStore.use.setImageSrc()
-  const resetBoundary = usePluginStore.use.resetBoundary()
+  const setTab = useExtraStore.use.setTab()
+  const tab = useExtraStore.use.tab()
 
   const imageListRef = useRef<any>()
-
-  const [images, setImages] = React.useState<string[]>([])
 
   const [loadingState, setLoadingState] = React.useState({
     uploading: false
   })
+
+  const tabs = () => {
+    return (
+      <Tabs defaultActiveKey={tab} onChange={(v) => setTab(v as any)}>
+        <TabPane tab="extend" key="extend"></TabPane>
+        <TabPane tab="partialRedraw" key="partialRedraw"></TabPane>
+      </Tabs>
+    )
+  }
 
   // REFACTOR: to imageSrc
   const shouldRequestUpload = !rectWrapper
@@ -216,13 +227,24 @@ const App: React.FC = () => {
   }
   return (
     <div>
-      <div className="flex flex-col justify-between">
-        <div>延展</div>
-        <div>
-          <div onClick={open}>上传图片</div>
+      <div className="relative flex flex-col justify-between">
+        {tabs()}
+        <div className="absolute right-0 top-0">
+          <Button onClick={open} icon={<UploadOutlined />}>
+            上传图片
+          </Button>
         </div>
       </div>
-      <div>可在画板中调整好位置，然后在插件中拖动虚线选择延展范围</div>
+      <div>
+        {true ? (
+          <Alert
+            message="Alert Message Text"
+            type="warning"
+            closable
+            // afterClose={handleClose}
+          />
+        ) : null}
+      </div>
       <div
         {...getRootProps({})}
         // 460 520-80
@@ -254,7 +276,7 @@ const App: React.FC = () => {
       <ImageList ref={imageListRef} />
 
       <div className="mt-auto">
-        <button onClick={generateDrawing}>Save</button>
+        <Button onClick={generateDrawing}>Save</Button>
       </div>
     </div>
   )

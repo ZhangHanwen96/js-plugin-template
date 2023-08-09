@@ -12,7 +12,7 @@ export interface Poster {
   height: number
 }
 
-// image is filled in a <div /> in jsDesign
+// image is filled in a <div /> in figma
 export interface ImageRectWrapper {
   x: number
   y: number
@@ -104,7 +104,7 @@ const resetImage = async () => {
   if (!imagePaint) return
   try {
     // const uint8 = await bgRectNode.exportAsync()
-    const imageNode = jsDesign.getImageByHash(imagePaint.imageHash)
+    const imageNode = figma.getImageByHash(imagePaint.imageHash)
     const uint8 = await imageNode.getBytesAsync()
     const { id, name, width, height } = bgRectNode as RectangleNode
     figma.ui.postMessage({
@@ -136,7 +136,7 @@ const eventPubsub = new Pubsub()
 
 const postMessage = async (pluginMessage: any) => {
   const requestId = uniqueId()
-  jsDesign.ui.postMessage(
+  figma.ui.postMessage(
     {
       ...pluginMessage,
       requestId
@@ -175,8 +175,10 @@ figma.on('currentpagechange', async () => {
 })
 
 // sync editor change to plugin
+// NOTE: in figma dragging will not trigger this event
 figma.on('selectionchange', () => {
   initNodes(false)
+
   if (!posterNode || !bgRectNode) {
     figma.ui.postMessage({
       type: 'reInitialize',
@@ -314,7 +316,7 @@ const uploadImage = async (src: string) => {
 
   figma.viewport.scrollAndZoomIntoView([rectangleNode])
 
-  jsDesign.currentPage.selection = [rectangleNode]
+  figma.currentPage.selection = [rectangleNode]
 
   initNodes()
 }

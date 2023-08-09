@@ -10,6 +10,7 @@ import {
   percentPositionToAbsolute
 } from '@/utils/position'
 import Marklines, { marklinePubsub } from '../Marklines'
+import { useExtraStore } from '@/store/extra'
 
 let isDraging = false
 let isResizing = false
@@ -368,7 +369,6 @@ const Background = () => {
           // |           |   |
           // -------------   |
           // ----------------|
-
           if (clientY < posterRect.y || clientY > imageRect.top) {
             if (clientY < posterRect.y) {
               const height = rectBoxRef.current.height + rectBoxRef.current.y
@@ -576,19 +576,18 @@ const Background = () => {
       : undefined
   }
 
-  const [boxSelectMode, { toggle }] = useToggle(false)
+  const tab = useExtraStore.use.tab()
 
   useUpdateEffect(() => {
-    if (boxSelectMode) {
+    if (tab === 'partialRedraw') {
       resetBoundary()
     } else {
       setBoxSelectDivStyle(undefined)
     }
-  }, [boxSelectMode])
+  }, [tab])
 
   const boxSelectDiv = () => {
     return (
-      // TODO: border animation
       boxSelectDivStyle && (
         <div
           className="gradient absolute"
@@ -597,7 +596,6 @@ const Background = () => {
             height: boxSelectDivStyle.height,
             left: boxSelectDivStyle.x,
             top: boxSelectDivStyle.y
-            // border: '1px solid red'
           }}
         />
       )
@@ -617,11 +615,8 @@ const Background = () => {
           ...posterStyle,
           aspectRatio: posterRatio
         }}
-        onMouseDownCapture={boxSelectMode && handleMouseSelectDown}
+        onMouseDownCapture={tab === 'partialRedraw' && handleMouseSelectDown}
       >
-        <button onClick={() => toggle()} className="absolute left-0 top-0">
-          {boxSelectMode ? 'defalt' : 'to box select'}
-        </button>
         <div
           className="striped absolute"
           style={{
