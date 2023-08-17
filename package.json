@@ -12,6 +12,10 @@
     "build": "npm run build:ui && npm run build:main -- --minify",
     "build:main": "esbuild plugin-src/code.tsx --bundle --outfile=dist/code.js",
     "build:ui": "npx vite build --minify esbuild --emptyOutDir=false",
+    "build:ui:testing": "VITE_PLUGIN_ENV=testing npx vite build --minify esbuild --emptyOutDir=false",
+    "build:ui:stage": "VITE_PLUGIN_ENV=stage npx vite build --minify esbuild --emptyOutDir=false",
+    "build:ui:prod": "VITE_PLUGIN_ENV=prod npx vite build --minify esbuild --emptyOutDir=false",
+    "build:ui:loreal": "VITE_PLUGIN_ENV=loreal npx vite build --minify esbuild --emptyOutDir=false",
     "build:watch": "concurrently -n widget,iframe \"npm run build:main -- --watch\" \"npm run build:ui -- --watch\"",
     "dev": "concurrently -n tsc,build,vite 'npm:tsc:watch' 'npm:build:watch' 'vite'",
     "dev:vite": "vite"
@@ -21,6 +25,7 @@
   "dependencies": {
     "@tezign/tezign-ui": "^3.0.39",
     "classnames": "^2.3.2",
+    "jsd-tezign-image": "^1.1.3",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-dropzone": "^14.2.3",

@@ -1,19 +1,24 @@
-import React, { useMemo, useRef } from 'react'
+import React, { FC, useMemo, useRef } from 'react'
 import './index.scss'
 import Background from '../components/background'
 import { usePluginStore } from '@/store'
 import { useMount } from 'ahooks'
-import { UploadOutlined } from '@tezign/icons'
+import { UploadOutlined, HistoryOutlined } from '@tezign/icons'
 
 import { Accept, useDropzone } from 'react-dropzone'
 import { delay, postMessage } from '@/utils'
 import ImageList from '@/components/image-list'
-import { Alert, Button, Tabs, Upload } from '@tezign/tezign-ui'
+import { Alert, Button, Empty, Popover, Tabs, TzSpin } from '@tezign/tezign-ui'
 import { useExtraStore } from '@/store/extra'
+import ImageHistory from '@/components/image-history'
+import { Mode } from '@/interface'
+const imageId = ['HXW26Gw8bk4', 'ACoZwVwjElU', 'bp1qQfAQOXw']
+const upsplashUrl = 'https://source.unsplash.com'
 
-const upsplashUrl = 'https://source.unsplash.com/ACoZwVwjElU'
 export const getCustomImageUrl = (width: number, height: number) => {
-  return `${upsplashUrl}/${width}x${height}`
+  const id = imageId[Math.floor(Math.random() * imageId.length)]
+  const url = `${upsplashUrl}/${id}`
+  return `${url}/${width}x${height}`
 }
 const baseStyle: React.CSSProperties = {
   borderWidth: 2,
@@ -37,12 +42,29 @@ const rejectStyle = {
   borderColor: '#ff1744'
 }
 
+const TipBanner: FC<{ tab: Mode }> = ({ tab }) => {
+  const message =
+    tab === 'extend'
+      ? '可在画板中调整好位置，然后在插件中拖动虚线选择延展范围'
+      : '请在插件中拖动虚线框，框柱需要重新绘制的区域'
+
+  return (
+    <Alert
+      message={message}
+      type="info"
+      closable
+      showIcon={true}
+      // afterClose={handleClose}
+    />
+  )
+}
+
 const loadImage = (url: string) => {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     const img = new Image()
     img.src = url
     img.onload = () => {
-      resolve(img)
+      resolve(url)
     }
     img.onerror = reject
   })
@@ -74,8 +96,12 @@ const App: React.FC = () => {
   const tabs = () => {
     return (
       <Tabs defaultActiveKey={tab} onChange={(v) => setTab(v as any)}>
-        <TabPane tab="extend" key="extend"></TabPane>
-        <TabPane tab="partialRedraw" key="partialRedraw"></TabPane>
+        <TabPane tab="智能延展" key="extend" tabKey="extend"></TabPane>
+        <TabPane
+          tab="智能重绘"
+          key="partialRedraw"
+          tabKey="partialRedraw"
+        ></TabPane>
       </Tabs>
     )
   }
@@ -85,61 +111,7 @@ const App: React.FC = () => {
 
   const generateDrawing = () => {
     imageListRef.current.generateImage()
-    // const { rectBox, scale } = usePluginStore.getState()
-
-    // const urls = Array.from({ length: 3 }).map(() =>
-    //   getCustomImageUrl(
-    //     Math.round(rectBox.width / scale),
-    //     Math.round(rectBox.height / scale)
-    //   )
-    // )
-    // setImages(urls)
   }
-
-  // const onImageClick = (url: string) => {
-  //   const { setInset, setImageSrc } = usePluginStore.getState()
-
-  //   // const url = getCustomImageUrl(
-  //   //   Math.round(rectBox.width / scale),
-  //   //   Math.round(rectBox.height / scale)
-  //   // )
-
-  //   // restore to image size to rectBox size
-  //   // loadImage(url).then(() => {
-  //   setImageSrc(url)
-  //   setInset(DEFAULT_INSET)
-  //   // })
-
-  //   const poster = document.getElementById('poster')
-
-  //   const pRect = absolutePositionToPercent(
-  //     rectBoxRef.current,
-  //     poster!.getBoundingClientRect()
-  //   )
-
-  //   parent.postMessage(
-  //     {
-  //       pluginMessage: {
-  //         type: 'updateImage',
-  //         payload: {
-  //           src: url,
-  //           rect: pRect
-  //         }
-  //       }
-  //     },
-  //     '*'
-  //   )
-  //   // setTimeout(() => {
-  //   //   parent.postMessage(
-  //   //     {
-  //   //       pluginMessage: {
-  //   //         type: 'manualReInitialize'
-  //   //       }
-  //   //     },
-  //   //     '*'
-  //   //   )
-  //   // }, 300)
-  // }
 
   useMount(() => {
     parent.postMessage(
@@ -225,30 +197,26 @@ const App: React.FC = () => {
       }
     }
   }
+
   return (
     <div>
-      <div className="relative flex flex-col justify-between">
-        {tabs()}
-        <div className="absolute right-0 top-0">
-          <Button onClick={open} icon={<UploadOutlined />}>
-            上传图片
-          </Button>
+      <div className="mb-2 px-3">
+        <div className="relative flex flex-col justify-between">
+          {tabs()}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2">
+            <Button onClick={open} icon={<UploadOutlined />}>
+              上传图片
+            </Button>
+          </div>
         </div>
       </div>
-      <div>
-        {true ? (
-          <Alert
-            message="Alert Message Text"
-            type="warning"
-            closable
-            // afterClose={handleClose}
-          />
-        ) : null}
+      <div className="mb-3 px-3">
+        <TipBanner tab={tab} />
       </div>
       <div
         {...getRootProps({})}
-        // 460 520-80
-        className="container relative flex h-[calc(460px-80px-120px)] w-[520px] flex-col bg-[#F3F5F7] px-8 pt-4"
+        // roughly 460-80-120 | 520
+        className="container relative flex h-[calc(460px-80px-120px)] w-full flex-col px-3"
       >
         {!shouldRequestUpload && <Background />}
         {shouldRequestUpload && (
@@ -256,13 +224,16 @@ const App: React.FC = () => {
             onClick={open}
             className="flex h-full w-full items-center justify-center"
           >
-            上传图片
+            <Empty
+              image={Empty.IMAGES.NO_PICTURE}
+              description="未匹配上背景图，请检查待延展图片命名是否是“背景”"
+            />
           </div>
         )}
 
         {loadingState.uploading && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-300/30 backdrop-blur-[2px]">
-            Loading
+            <TzSpin size="small" />
           </div>
         )}
 
@@ -275,8 +246,20 @@ const App: React.FC = () => {
 
       <ImageList ref={imageListRef} />
 
-      <div className="mt-auto">
-        <Button onClick={generateDrawing}>Save</Button>
+      <div
+        className="mt-auto flex justify-between p-3"
+        style={{
+          borderTop: '1px solid #DCE1E5'
+        }}
+      >
+        <Popover
+          placement="bottomLeft"
+          title="历史记录"
+          content={<ImageHistory />}
+        >
+          <Button type="default" icon={<HistoryOutlined />}></Button>
+        </Popover>
+        <Button onClick={generateDrawing}>生成</Button>
       </div>
     </div>
   )

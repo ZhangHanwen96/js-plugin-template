@@ -4,6 +4,7 @@ import React from 'react'
 import ConfigProvider from '@tezign/tezign-ui/es/config-provider'
 import { usePluginStore } from './store'
 import zhCN from '@tezign/tezign-ui/lib/locale/zh_CN'
+import { AuthProdiver } from './components/auth-provider'
 
 const root = createRoot(document.getElementById('root')!)
 
@@ -12,7 +13,9 @@ const Root = () => {
 
   return (
     <ConfigProvider locale={zhCN}>
+      {/* <AuthProdiver> */}
       <App key={__remount_updater} />
+      {/* </AuthProdiver> */}
     </ConfigProvider>
   )
 }

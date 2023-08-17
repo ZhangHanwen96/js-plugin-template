@@ -11,6 +11,8 @@ import {
 } from '@/utils/position'
 import Marklines, { marklinePubsub } from '../Marklines'
 import { useExtraStore } from '@/store/extra'
+import { Button, Tooltip } from '@tezign/tezign-ui'
+import { RedoOutlined, RestOutlined } from '@tezign/icons'
 
 let isDraging = false
 let isResizing = false
@@ -51,8 +53,6 @@ const isIntersecting = (a: Rect, b: Rect) => {
 // plugin -> absolutePositionToPercent(targetRect, pluginContainerRect)
 // -> percentPositionToAbsolute(targetRect, editorContainerRect) -> editor
 
-let _image_bytes: Uint8Array | null = null
-
 const Background = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const posterBgRef = useRef<HTMLDivElement>(null)
@@ -67,7 +67,11 @@ const Background = () => {
   const setImageSrc = usePluginStore.use.setImageSrc()
   const resetBoundary = usePluginStore.use.resetBoundary()
 
-  const [boxSelectDivStyle, setBoxSelectDivStyle] = useState<Rect>()
+  const boxSelectDivStyle = useExtraStore.use.boxSelectDivStyle?.()
+  const setBoxSelectDivStyle = useExtraStore.use.setBoxSelectDivStyle()
+
+  console.log('[Rect Box]:', rectBox)
+  console.log('[boxSelectDivStyle]', boxSelectDivStyle)
 
   /**
    * @param rect {Rect} relative to 'poster'
@@ -153,10 +157,17 @@ const Background = () => {
     const { height: maxHeight } = posterBgRef.current.getBoundingClientRect()
     posterBgRef.current.style.height = height
 
-    console.log(maxHeight, rect.width)
+    const width = posterBgRef.current.style.width
+    posterBgRef.current.style.width = '100%'
+    // force reflow
+    posterBgRef.current.offsetHeight
+    const { width: maxWidth } = posterBgRef.current.getBoundingClientRect()
+    posterBgRef.current.style.width = width
+
+    console.log('[Max Rect]: ,', maxHeight, maxWidth)
     usePluginStore
       .getState()
-      .calculateScale({ height: maxHeight, width: rect.width })
+      .calculateScale({ height: maxHeight, width: maxWidth })
       .then(() => {
         rectBoxRef.current = usePluginStore.getState().rectBox
       })
@@ -208,7 +219,7 @@ const Background = () => {
           usePluginStore.setState({
             imageFile: file
           })
-          _image_bytes = payload.thumb as Uint8Array
+          // _image_bytes = payload.thumb as Uint8Array
           reader.onload = () => {
             setImageSrc(reader.result as string)
           }
@@ -506,14 +517,15 @@ const Background = () => {
     const isCurrentActive = activeDir === dir
     if (hasActiveDir && !isCurrentActive) return null
 
-    const size = 3
+    const size = 4
 
     const getCursorStyle = (dir: 'top' | 'right' | 'bottom' | 'left') => {
       if (dir === 'top' || dir === 'bottom') {
         return {
           top: dir === 'bottom' ? `calc(100% - ${size}px)` : undefined,
           bottom: dir === 'top' ? `calc(100% - ${size}px)` : undefined,
-          width: '100%',
+          left: '10px',
+          right: '10px',
           height: `${size}px`,
           cursor: cursors[dir]
         } as React.CSSProperties
@@ -521,7 +533,8 @@ const Background = () => {
       return {
         left: dir === 'right' ? `calc(100% - ${size}px)` : undefined,
         right: dir === 'left' ? `calc(100% - ${size}px)` : undefined,
-        height: '100%',
+        top: '10px',
+        bottom: '10px',
         width: `${size}px`,
         cursor: cursors[dir]
       }
@@ -531,9 +544,8 @@ const Background = () => {
     return (
       <div
         className={clx(
-          'resize-handler absolute w-full hover:bg-blue-700',
-          isCurrentActive && 'bg-blue-400',
-          'group-hover:bg-blue-700'
+          'resize-handler absolute bg-[var(--color-primary)]',
+          isCurrentActive && 'bg-sky-600'
         )}
         dir={dir}
         style={{
@@ -566,7 +578,7 @@ const Background = () => {
           ? undefined
           : '100%'
         : undefined
-      : undefined,
+      : '100%',
     height: posterRatio
       ? isHorizontal
         ? fullHeight
@@ -595,7 +607,8 @@ const Background = () => {
             width: boxSelectDivStyle.width,
             height: boxSelectDivStyle.height,
             left: boxSelectDivStyle.x,
-            top: boxSelectDivStyle.y
+            top: boxSelectDivStyle.y,
+            backgroundColor: '#33a0e44c'
           }}
         />
       )
@@ -604,9 +617,18 @@ const Background = () => {
 
   return (
     <div
-      className="flex h-full w-full items-center justify-center"
+      className="relative flex h-full w-full items-center justify-center rounded bg-[#F3F5F7] p-2"
       ref={containerRef}
     >
+      <Tooltip title="重置延展区域">
+        <Button
+          className="!absolute right-1 top-1"
+          icon={<RedoOutlined rotate={-90} />}
+          size="small"
+          type="default"
+          onClick={resetBoundary}
+        />
+      </Tooltip>
       <div
         ref={posterBgRef}
         id="poster"
@@ -640,7 +662,7 @@ const Background = () => {
         >
           <div
             ref={imageRef}
-            className="absolute bg-green-500"
+            className="absolute bg-green-300/30"
             style={{
               ...inset,
               backgroundImage: imageSrc ? `url(${imageSrc})` : undefined,

@@ -1,19 +1,24 @@
-import { SetStateAction } from 'react'
+import { FC, SetStateAction } from 'react'
 import { create } from 'zustand'
 import { devtools, subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-
+import { ExclamationCircleOutlined } from '@tezign/icons'
 import { createSelectors } from './createSelectors'
 import Pubsub from '../utils/pubsub'
-import { Rect } from '@/interface'
+import { HistoryRecord, Rect } from '@/interface'
 import { toFixed2 } from '@/utils/position'
 import { postMessage } from '@/utils'
 import { rectBoxRef } from '@/components/background'
+import { useExtraStore } from './extra'
+import { Button, Checkbox, TzModal } from '@tezign/tezign-ui'
+import React from 'react'
 
 export interface Poster {
   width: number
   height: number
 }
+
+let modal: ReturnType<typeof TzModal.show>
 
 // image is filled in a <div /> in jsDesign
 export interface ImageRectWrapper {
@@ -38,8 +43,10 @@ type State = {
   inset: typeof DEFAULT_INSET
   imageSrc?: string
   imageFile?: File
-  imageHistory: string[]
+  imageHistory: HistoryRecord[]
   __remount_updater: number
+  networkError: any
+  loading: boolean
 }
 
 type Actions = {
@@ -52,12 +59,58 @@ type Actions = {
   }) => Promise<void>
   setRectBox: (rect: React.SetStateAction<Rect>) => void
   setInset: (rect: React.SetStateAction<typeof DEFAULT_INSET>) => void
-  addImageHistory: (urls: string[] | undefined) => void
+  addImageHistory: (urls: HistoryRecord[] | undefined) => void
   setImageSrc: (src: string) => void
   resetBoundary: () => void
 }
 
 export const eventPubsub = new Pubsub()
+
+const Footer: FC<{ onOk: any; onCancel: any }> = ({ onOk, onCancel }) => {
+  const [checked, setChecked] = React.useState(false)
+
+  return (
+    <div className="flex flex-row items-center justify-between">
+      <Checkbox
+        value={checked}
+        onChange={(v) => {
+          setChecked(v.target.checked)
+        }}
+      >
+        不再提醒
+      </Checkbox>
+      <div className="">
+        <Button
+          type="default"
+          onClick={() => {
+            onCancel()
+            // useExtraStore.setState({
+            //   pageChangeAlert: {
+            //     show: !checked,
+            //     shouldChange: false
+            //   }
+            // })
+          }}
+        >
+          取消
+        </Button>
+        <Button
+          onClick={() => {
+            onOk()
+            useExtraStore.setState({
+              pageChangeAlert: {
+                show: !checked,
+                shouldChange: true
+              }
+            })
+          }}
+        >
+          我知道了
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 interface MessageData {
   pluginMessage: {
@@ -124,22 +177,34 @@ window.addEventListener('message', (e: MessageEvent<MessageData>) => {
       })
       return
     }
+
+    console.log('[reInitialize]: payload ', payload)
+
     const initData = getInitData(
       maxPosterWidth,
       maxPosterHeight,
       pluginMessage.payload
     )
+
+    console.log('[initData]: ', initData)
+
     usePluginStore.setState({
       ...initData,
       inset: DEFAULT_INSET
     })
   } else if (pluginMessage.type === 'currentpagechange') {
-    if (window.confirm('监测到页面切换，确定清空当前插件的历史吗?')) {
-      // TODO: clear all
+    if (modal) {
+      return
+    }
+    const onPagechange = () => {
+      useExtraStore.setState({
+        boxSelectDivStyle: undefined
+      })
       usePluginStore.setState({
         imageSrc: undefined,
         inset: DEFAULT_INSET,
-        __remount_updater: usePluginStore.getState().__remount_updater + 1
+        __remount_updater: usePluginStore.getState().__remount_updater + 1,
+        networkError: undefined
         // rectBox: {
         //   height: 0,
         //   width: 0,
@@ -159,6 +224,88 @@ window.addEventListener('message', (e: MessageEvent<MessageData>) => {
         '*'
       )
     }
+    const {
+      pageChangeAlert: { shouldChange, show }
+    } = useExtraStore.getState()
+
+    if (show) {
+      modal = TzModal.show({
+        maskClosable: false,
+        width: '360px',
+        centered: true,
+        footer: (
+          <Footer
+            onOk={() => {
+              modal.destroy()
+              modal = undefined
+              onPagechange()
+            }}
+            onCancel={() => {
+              modal.destroy()
+              modal = undefined
+            }}
+          />
+        ),
+        // title: (
+        //   <div className="flex items-center gap-2">
+
+        //     <span></span>
+        //   </div>
+        // ),
+        content: (
+          <div className="tzui-modal-confirm-body">
+            <ExclamationCircleOutlined
+              style={{
+                color: '#FAAD14'
+              }}
+            />
+            <span className="tzui-modal-confirm-title">
+              确认切换页面/画板吗？
+            </span>
+            <div className="tzui-modal-confirm-content">
+              确认切换页面/画板吗？
+            </div>
+          </div>
+        )
+      })
+    } else {
+      if (shouldChange) {
+        onPagechange()
+      }
+    }
+
+    // if (window.confirm('监测到页面切换，确定清空当前插件的历史吗?')) {
+    //   // TODO: clear all
+    //   useExtraStore.setState({
+    //     setBoxSelectDivStyle: undefined
+    //   })
+    //   usePluginStore.setState({
+    //     imageSrc: undefined,
+    //     inset: DEFAULT_INSET,
+    //     __remount_updater: usePluginStore.getState().__remount_updater + 1
+    //     // rectBox: {
+    //     //   height: 0,
+    //     //   width: 0,
+    //     //   x: 0,
+    //     //   y: 0
+    //     // },
+    //   })
+    //   parent.postMessage(
+    //     {
+    //       pluginMessage: {
+    //         requestId: pluginMessage.requestId,
+    //         payload: {
+    //           confirm: true
+    //         }
+    //       }
+    //     },
+    //     '*'
+    //   )
+    // }
+  } else if (pluginMessage.type === 'syncStorage') {
+    useExtraStore.setState({
+      storage: pluginMessage.payload
+    })
   }
 
   const { requestId, payload } = pluginMessage
@@ -172,7 +319,9 @@ const _pluginStore = create(
     subscribeWithSelector(
       immer<State & Actions>((set, get) => ({
         scale: 1,
+        networkError: undefined,
         inset: DEFAULT_INSET,
+        loading: false,
         rectBox: {
           height: 0,
           width: 0,

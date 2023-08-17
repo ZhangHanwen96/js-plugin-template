@@ -29,25 +29,54 @@ figma.showUI(__html__, {
 })
 const HISTORY_KEY = 'tezign-history'
 
-const historyStorage = {
-  get(pageId: string) {
+// const historyStorage = {
+//   get(pageId: string) {
+//     const history = figma.root.getPluginData(HISTORY_KEY)
+//     try {
+//       return JSON.parse(history)[pageId]
+//     } catch (e) {
+//       console.error(e)
+//     }
+//   },
+//   set(pageId: string, payload: any) {
+//     const history = historyStorage.get(pageId) || {}
+//     history[pageId] = payload
+//     figma.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
+//   },
+//   delete(pageId: string) {
+//     const history = historyStorage.get(pageId)
+//     if (!history) return
+//     delete history[pageId]
+//     figma.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
+//   }
+// }
+
+const storage = {
+  get(key?: string) {
     const history = figma.root.getPluginData(HISTORY_KEY)
     try {
-      return JSON.parse(history)[pageId]
+      const h = JSON.parse(history)
+      return key ? h[key] : h
     } catch (e) {
       console.error(e)
+      return null
     }
   },
-  set(pageId: string, payload: any) {
-    const history = historyStorage.get(pageId) || {}
-    history[pageId] = payload
-    figma.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
+  set(key: string, value: string) {
+    const history = storage.get() || {}
+    history[key] = value
+    try {
+      figma.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
+    } catch (error) {
+      console.error(error)
+    }
   },
-  delete(pageId: string) {
-    const history = historyStorage.get(pageId)
-    if (!history) return
-    delete history[pageId]
-    figma.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
+  delete(key: string) {
+    try {
+      const history = storage.get()
+      delete history[key]
+      figma.root.setPluginData(HISTORY_KEY, JSON.stringify(history))
+    } catch (error) {}
   }
 }
 
@@ -151,14 +180,18 @@ const postMessage = async (pluginMessage: any) => {
     })
     setTimeout(() => {
       reject(new Error('timeout'))
-    }, 4000)
+    }, 5_000)
   })
 
   return responsePromise
 }
 
+let $preventReinit = false
+
 figma.on('currentpagechange', async () => {
   try {
+    $preventReinit = true
+    console.log('111111111111111')
     const response = await postMessage({
       type: 'currentpagechange'
     })
@@ -171,12 +204,16 @@ figma.on('currentpagechange', async () => {
     }
   } catch (error) {
     console.error(error)
+  } finally {
+    $preventReinit = false
   }
 })
 
 // sync editor change to plugin
 // NOTE: in figma dragging will not trigger this event
 figma.on('selectionchange', () => {
+  if ($preventReinit) return
+  console.log(222222222222)
   initNodes(false)
 
   if (!posterNode || !bgRectNode) {
@@ -323,6 +360,13 @@ const uploadImage = async (src: string) => {
 
 const handleFirstLoad = () => {
   reInitialize()
+  try {
+    const history = storage.get() || {}
+    figma.ui.postMessage({
+      type: 'syncStorage',
+      payload: history
+    })
+  } catch (error) {}
 }
 
 const updateImage = async ({
@@ -356,6 +400,18 @@ const updateImage = async ({
   // resetImage()
 }
 
+const handleStorage = (payload: {
+  type: 'get' | 'set' | 'delete'
+  params: any[]
+}) => {
+  const func = storage[payload.type]
+  try {
+    func.apply(storage, payload.params)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 figma.ui.onmessage = (msg) => {
   const { type, requestId, payload } = msg
   console.log(
@@ -383,6 +439,9 @@ figma.ui.onmessage = (msg) => {
       break
     case 'updateImage':
       updateImage(payload)
+      break
+    case 'storage':
+      handleStorage(payload)
       break
     default:
       requestId && eventPubsub.notify(requestId, payload)
