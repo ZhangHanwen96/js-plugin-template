@@ -1,6 +1,6 @@
 import { SetStateAction } from 'react'
 import { create } from 'zustand'
-import { devtools, subscribeWithSelector } from 'zustand/middleware'
+import { subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
 import { createSelectors } from './createSelectors'
@@ -22,35 +22,27 @@ type Actions = {
 }
 
 const _extraStore = create(
-  devtools(
-    subscribeWithSelector(
-      immer<State & Actions>((set) => ({
-        tab: 'extend',
-        pageChangeAlert: {
-          shouldChange: false,
-          show: true
-        },
-        storage: {},
-        setTab: (tab) => {
-          set((state) => {
-            state.tab = typeof tab === 'function' ? tab(state.tab) : tab
-          })
-        },
-        boxSelectDivStyle: undefined,
-        setBoxSelectDivStyle(style) {
-          set((state) => {
-            state.boxSelectDivStyle =
-              typeof style === 'function'
-                ? style(state.boxSelectDivStyle)
-                : style
-          })
-        }
-      }))
-    ),
-    {
-      name: 'tezign-extra-store',
-      store: 'tezign-extra-store'
-    }
+  subscribeWithSelector(
+    immer<State & Actions>((set) => ({
+      tab: 'extend',
+      pageChangeAlert: {
+        shouldChange: false,
+        show: true
+      },
+      storage: {},
+      setTab: (tab) => {
+        set((state) => {
+          state.tab = typeof tab === 'function' ? tab(state.tab) : tab
+        })
+      },
+      boxSelectDivStyle: undefined,
+      setBoxSelectDivStyle(style) {
+        set((state) => {
+          state.boxSelectDivStyle =
+            typeof style === 'function' ? style(state.boxSelectDivStyle) : style
+        })
+      }
+    }))
   )
 )
 const useExtraStore = createSelectors(_extraStore)

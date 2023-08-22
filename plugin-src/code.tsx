@@ -132,7 +132,13 @@ const resetImage = async () => {
   const imagePaint = findImageFill(bgRectNode)
   if (!imagePaint) return
   try {
-    // const uint8 = await bgRectNode.exportAsync()
+    // const uint8 = await bgRectNode.exportAsync({
+    //   format: 'PNG',
+    //   constraint: {
+    //     type: 'WIDTH',
+    //     value: 200
+    //   }
+    // })
     const imageNode = figma.getImageByHash(imagePaint.imageHash)
     const uint8 = await imageNode.getBytesAsync()
     const { id, name, width, height } = bgRectNode as RectangleNode
@@ -191,7 +197,6 @@ let $preventReinit = false
 figma.on('currentpagechange', async () => {
   try {
     $preventReinit = true
-    console.log('111111111111111')
     const response = await postMessage({
       type: 'currentpagechange'
     })
@@ -213,7 +218,6 @@ figma.on('currentpagechange', async () => {
 // NOTE: in figma dragging will not trigger this event
 figma.on('selectionchange', () => {
   if ($preventReinit) return
-  console.log(222222222222)
   initNodes(false)
 
   if (!posterNode || !bgRectNode) {
@@ -412,6 +416,45 @@ const handleStorage = (payload: {
   }
 }
 
+const handleViewportImage = async (
+  requestId: string,
+  payload: {
+    height: number
+    width: number
+    format: 'PNG' | 'JPG'
+  }
+) => {
+  console.log(11111)
+  if (!bgRectNode) return
+  console.log(22222)
+  const imagePaint = findImageFill(bgRectNode)
+  if (!imagePaint) return
+  console.log(333333)
+  const { width } = payload
+  console.log('exportAsync width', width)
+  const uint8 = await bgRectNode.exportAsync({
+    format: 'PNG',
+    constraint: {
+      type: 'WIDTH',
+      value: width
+    }
+  })
+  console.log('exportAsync done')
+
+  figma.ui.postMessage(
+    {
+      requestId,
+      type: 'viewportImage:response',
+      payload: {
+        uint8: uint8 as Uint8Array
+      }
+    },
+    {
+      origin: '*'
+    }
+  )
+}
+
 figma.ui.onmessage = (msg) => {
   const { type, requestId, payload } = msg
   console.log(
@@ -442,6 +485,9 @@ figma.ui.onmessage = (msg) => {
       break
     case 'storage':
       handleStorage(payload)
+      break
+    case 'viewportImage':
+      handleViewportImage(requestId, payload)
       break
     default:
       requestId && eventPubsub.notify(requestId, payload)

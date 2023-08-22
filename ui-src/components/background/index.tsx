@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 import React, { useRef, useState } from 'react'
 import { useMemoizedFn, useMount, useToggle, useUpdateEffect } from 'ahooks'
-import { usePluginStore } from '@/store'
+import { rectBoxRef, usePluginStore } from '@/store'
 import clx from 'classnames'
 import { Rect } from '@/interface'
 import { useMouseSelect } from '@/hooks/useMouseSelect'
@@ -35,12 +35,6 @@ const cursors: Record<
 
 let lastRect: Rect
 
-export const rectBoxRef = {
-  current: undefined
-} as unknown as {
-  current: Rect
-}
-
 const isIntersecting = (a: Rect, b: Rect) => {
   return !(
     a.x < b.x &&
@@ -66,12 +60,13 @@ const Background = () => {
   const imageSrc = usePluginStore.use.imageSrc?.()
   const setImageSrc = usePluginStore.use.setImageSrc()
   const resetBoundary = usePluginStore.use.resetBoundary()
+  const tab = useExtraStore.use.tab()
 
   const boxSelectDivStyle = useExtraStore.use.boxSelectDivStyle?.()
   const setBoxSelectDivStyle = useExtraStore.use.setBoxSelectDivStyle()
 
   console.log('[Rect Box]:', rectBox)
-  console.log('[boxSelectDivStyle]', boxSelectDivStyle)
+  // console.log('[boxSelectDivStyle]', boxSelectDivStyle)
 
   /**
    * @param rect {Rect} relative to 'poster'
@@ -514,6 +509,7 @@ const Background = () => {
   const hasActiveDir = !!activeDir
 
   const resizeCursors = ['top', 'right', 'bottom', 'left'].map((dir) => {
+    if (tab !== 'extend') return
     const isCurrentActive = activeDir === dir
     if (hasActiveDir && !isCurrentActive) return null
 
@@ -588,8 +584,6 @@ const Background = () => {
       : undefined
   }
 
-  const tab = useExtraStore.use.tab()
-
   useUpdateEffect(() => {
     if (tab === 'partialRedraw') {
       resetBoundary()
@@ -620,15 +614,17 @@ const Background = () => {
       className="relative flex h-full w-full items-center justify-center rounded bg-[#F3F5F7] p-2"
       ref={containerRef}
     >
-      <Tooltip title="重置延展区域">
-        <Button
-          className="!absolute right-1 top-1"
-          icon={<RedoOutlined rotate={-90} />}
-          size="small"
-          type="default"
-          onClick={resetBoundary}
-        />
-      </Tooltip>
+      {tab === 'extend' && (
+        <Tooltip title="重置延展区域">
+          <Button
+            className="!absolute right-1 top-1"
+            icon={<RedoOutlined rotate={-90} />}
+            size="small"
+            type="default"
+            onClick={resetBoundary}
+          />
+        </Tooltip>
+      )}
       <div
         ref={posterBgRef}
         id="poster"

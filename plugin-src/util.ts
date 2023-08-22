@@ -19,6 +19,8 @@ export const findImageFill = (rectNode: RectangleNode): ImagePaint | null => {
   // @ts-ignore
   for (const paint of rectNode.fills) {
     if (paint.type === 'IMAGE') {
+      const p = paint as ImagePaint
+      console.log('scale mode', p.scaleMode)
       return paint as ImagePaint
     }
   }

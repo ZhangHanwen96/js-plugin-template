@@ -1,8 +1,7 @@
-import { DEFAULT_INSET, usePluginStore } from '@/store'
+import { DEFAULT_INSET, rectBoxRef, usePluginStore } from '@/store'
 import { absolutePositionToPercent } from '@/utils/position'
 import { Empty, Timeline } from '@tezign/tezign-ui'
 import React, { useEffect } from 'react'
-import { rectBoxRef } from '../background'
 
 const ImageHistory = () => {
   const imageHistory = usePluginStore.use.imageHistory()

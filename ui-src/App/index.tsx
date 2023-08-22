@@ -6,7 +6,7 @@ import { useMount } from 'ahooks'
 import { UploadOutlined, HistoryOutlined } from '@tezign/icons'
 
 import { Accept, useDropzone } from 'react-dropzone'
-import { delay, postMessage } from '@/utils'
+import { delay, fileToUrl, postMessage } from '@/utils'
 import ImageList from '@/components/image-list'
 import { Alert, Button, Empty, Popover, Tabs, TzSpin } from '@tezign/tezign-ui'
 import { useExtraStore } from '@/store/extra'
@@ -159,41 +159,40 @@ const App: React.FC = () => {
     [isFocused, isDragAccept, isDragReject]
   )
 
-  const handleImageUpload = (file: File) => {
+  const handleImageUpload = async (file: File) => {
     // const file = e.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.readAsDataURL(file)
-      reader.onload = async () => {
-        const url = reader.result
-        setImageSrc(url as string)
-        usePluginStore.setState({
-          imageFile: file
-        })
-        parent.postMessage(
-          {
-            pluginMessage: {
-              type: 'uploadImage',
-              payload: url
-            }
-          },
-          '*'
-        )
-        setLoadingState((pre) => ({ ...pre, uploading: true }))
+      // const reader = new FileReader()
+      // reader.readAsDataURL(file)
+      const url = await fileToUrl(file)
 
-        await delay(2500)
+      setImageSrc(url as string)
+      usePluginStore.setState({
+        imageFile: file
+      })
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: 'uploadImage',
+            payload: url
+          }
+        },
+        '*'
+      )
+      setLoadingState((pre) => ({ ...pre, uploading: true }))
 
-        const responsePromise = postMessage({
-          type: 'manualReInitialize'
-        })
+      await delay(2500)
 
-        try {
-          await responsePromise
-        } catch (error) {
-          console.error(error)
-        } finally {
-          setLoadingState((pre) => ({ ...pre, uploading: false }))
-        }
+      const responsePromise = postMessage({
+        type: 'manualReInitialize'
+      })
+
+      try {
+        await responsePromise
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoadingState((pre) => ({ ...pre, uploading: false }))
       }
     }
   }
@@ -237,7 +236,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <input {...getInputProps()} />
+        <input {...getInputProps({})} />
         <div
           className="pointer-events-none absolute inset-0 z-10"
           style={dropzoneStyle}

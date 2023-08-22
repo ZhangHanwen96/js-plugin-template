@@ -8,7 +8,6 @@ import Pubsub from '../utils/pubsub'
 import { HistoryRecord, Rect } from '@/interface'
 import { toFixed2 } from '@/utils/position'
 import { postMessage } from '@/utils'
-import { rectBoxRef } from '@/components/background'
 import { useExtraStore } from './extra'
 import { Button, Checkbox, TzModal } from '@tezign/tezign-ui'
 import React from 'react'
@@ -16,6 +15,12 @@ import React from 'react'
 export interface Poster {
   width: number
   height: number
+}
+
+export const rectBoxRef = {
+  current: undefined
+} as unknown as {
+  current: Rect
 }
 
 let modal: ReturnType<typeof TzModal.show>

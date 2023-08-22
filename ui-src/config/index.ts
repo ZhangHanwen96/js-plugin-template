@@ -10,7 +10,7 @@ const getConfig = (
       return {
         appId: '64cc6aeaee874629d062eafb',
         appSecret: 'LsNQhekRa26ExR9X9bdu49wS7OMLIqT5asz99zajO2FfjJ0kZc',
-        js_api_origin: 'test-api.js.design'
+        js_api_origin: 'https://test-api.js.design'
       }
   }
 }

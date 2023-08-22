@@ -1,4 +1,6 @@
+import { rectBoxRef } from '@/store'
 import { Rect } from '@/interface'
+import { useExtraStore } from '@/store/extra'
 
 export const toFixed2 = (num: number, precision = 2) => {
   return Number(num.toFixed(precision))
@@ -39,3 +41,41 @@ export const percentPositionToAbsolute = (
     height
   }
 }
+
+// export const getBoxselectPercentageRect = () => {
+//   const { boxSelectDivStyle: rect } = useExtraStore.getState()
+//   if (!rect) return
+//   // const right = Math.min(
+//   //   rect.x + rect.width,
+//   //   rectBoxRef.current.x + rectBoxRef.current.width
+//   // )
+//   // const bottom = Math.min(
+//   //   rect.y + rect.height,
+//   //   rectBoxRef.current.height + rectBoxRef.current.y
+//   // )
+//   // const left = Math.max(rect.x, rectBoxRef.current.x)
+//   // const top = Math.max(rect.y, rectBoxRef.current.y)
+//   // const intersectionRect = {
+//   //   x: left,
+//   //   y: top,
+//   //   width: right - left,
+//   //   height: bottom - top
+//   // }
+
+//   // const relativeIntersectionRectToImage = {
+//   //   ...intersectionRect,
+//   //   x: intersectionRect.x - rectBoxRef.current.x,
+//   //   y: intersectionRect.y - rectBoxRef.current.y
+//   // }
+
+//   // const percentageRect = absolutePositionToPercent(
+//   //   relativeIntersectionRectToImage,
+//   //   {
+//   //     x: 0,
+//   //     y: 0,
+//   //     width: rectBoxRef.current.width,
+//   //     height: rectBoxRef.current.height
+//   //   }
+//   // )
+//   // return percentageRect
+// }
