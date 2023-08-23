@@ -109,6 +109,7 @@ const getPluginBgNode = () => {
 
 let bgRectNode: RectangleNode | undefined
 let bgRectNodeRect: Rect
+let posterNodeRect: Rect
 let imageHash: string
 
 const initNodes = (resetRect = true) => {
@@ -120,6 +121,12 @@ const initNodes = (resetRect = true) => {
       y: bgRectNode.y,
       width: bgRectNode.width,
       height: bgRectNode.height
+    }
+    posterNodeRect = {
+      x: 0,
+      y: 0,
+      width: posterNode.width,
+      height: posterNode.height
     }
     imageHash = (bgRectNode.fills[0] as ImagePaint)?.imageHash
   }
@@ -234,14 +241,19 @@ figma.on('selectionchange', () => {
     width: bgRectNode.width,
     height: bgRectNode.height
   }
+  const containerRect: Rect = {
+    x: 0,
+    y: 0,
+    width: posterNode.width,
+    height: posterNode.height
+  }
+
+  // Frame size changed
+  if (!isEqual(containerRect, posterNodeRect)) {
+    reInitialize()
+  }
 
   if (!isEqual(wrapperRect, bgRectNodeRect)) {
-    const containerRect: Rect = {
-      x: 0,
-      y: 0,
-      width: posterNode.width,
-      height: posterNode.height
-    }
     const pRect = absolutePositionToPercent(wrapperRect, containerRect)
 
     figma.ui.postMessage({
@@ -416,6 +428,9 @@ const handleStorage = (payload: {
   }
 }
 
+/**
+ * @deprecated
+ */
 const handleViewportImage = async (
   requestId: string,
   payload: {
@@ -424,14 +439,10 @@ const handleViewportImage = async (
     format: 'PNG' | 'JPG'
   }
 ) => {
-  console.log(11111)
   if (!bgRectNode) return
-  console.log(22222)
   const imagePaint = findImageFill(bgRectNode)
   if (!imagePaint) return
-  console.log(333333)
   const { width } = payload
-  console.log('exportAsync width', width)
   const uint8 = await bgRectNode.exportAsync({
     format: 'PNG',
     constraint: {
@@ -439,8 +450,6 @@ const handleViewportImage = async (
       value: width
     }
   })
-  console.log('exportAsync done')
-
   figma.ui.postMessage(
     {
       requestId,

@@ -1,34 +1,24 @@
 import React, {
-  FC,
   forwardRef,
-  useCallback,
-  useEffect,
   useImperativeHandle,
   useMemo,
-  useReducer,
   useState
 } from 'react'
+import capitalize from 'lodash/capitalize'
 import SingleAiImage from './AIImage'
-import throttle from 'lodash/throttle'
-import loadingGif from '@/assets/image-loading-sekelton.gif'
-import { useMemoizedFn, useRequest, useUpdate, useUpdateEffect } from 'ahooks'
+import { useMemoizedFn, useUpdateEffect } from 'ahooks'
 import {
   getExtendAIParam,
-  extendImage,
   getExtendImageSingleBase,
   ExtendPosition
 } from '@/service/extendImage'
-import clx from 'classnames'
 import { DEFAULT_INSET, usePluginStore } from '@/store'
 import { absolutePositionToPercent } from '@/utils/position'
 import { rectBoxRef } from '@/store'
-import { getCustomImageUrl } from '@/App'
-import { base64ToDataUrl, delay, fileToUrl } from '@/utils'
 import { useExtraStore } from '@/store/extra'
 import { Mode } from '@/interface'
 // import { partialRedraw } from '@/service/partialRedraw'
-import { message } from '@tezign/tezign-ui'
-import { getPartialRedrawParams, partialRedraw } from '@/service/partialRedraw'
+import { getPartialRedrawParams } from '@/service/partialRedraw'
 import { Context, ctx } from './ImageProvider'
 import { AIProxyParams } from '@/service/aiProxy'
 
@@ -115,9 +105,10 @@ const ImageList = forwardRef<
     setRequestParams(undefined)
     if (mode === 'extend') {
       const { extendDirection, height, file, width } = await getExtendAIParam()
+
       const extendParams = await getExtendImageSingleBase(file, {
         height,
-        position: `to${extendDirection.toUpperCase()}` as Exclude<
+        position: `to${capitalize(extendDirection)}` as Exclude<
           ExtendPosition,
           'center'
         >,
@@ -129,6 +120,8 @@ const ImageList = forwardRef<
         params: extendParams
       })
     } else {
+      const boxSelectDivStyle = useExtraStore.getState().boxSelectDivStyle
+      if (!boxSelectDivStyle) return
       const redrawParams = await getPartialRedrawParams()
       setRequestParams({
         mode: 'partialRedraw',
@@ -147,18 +140,23 @@ const ImageList = forwardRef<
     retry
   }))
 
-  const onImageClick = (url: string, mode: Mode) => {
+  const onImageClick = (
+    { dataUrl, id, mode }: { dataUrl: string; mode: Mode; id: string },
+    dir?: ExtendPosition
+  ) => {
     const { setInset, setImageSrc, addImageHistory } = usePluginStore.getState()
     const { setBoxSelectDivStyle } = useExtraStore.getState()
 
-    setImageSrc(url)
+    setImageSrc(dataUrl)
     // reset box select
     setBoxSelectDivStyle(undefined)
     addImageHistory([
       {
         mode,
-        src: url,
-        timestamp: Date.now()
+        src: dataUrl,
+        timestamp: Date.now(),
+        dir,
+        id
       }
     ])
     // file
@@ -179,7 +177,7 @@ const ImageList = forwardRef<
         pluginMessage: {
           type: 'updateImage',
           payload: {
-            src: url,
+            src: dataUrl,
             rect: pRect
           }
         }

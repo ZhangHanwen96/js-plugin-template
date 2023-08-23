@@ -1,6 +1,7 @@
+import { ExtendPosition } from '@/service/extendImage'
 import { DEFAULT_INSET, rectBoxRef, usePluginStore } from '@/store'
 import { absolutePositionToPercent } from '@/utils/position'
-import { Empty, Timeline } from '@tezign/tezign-ui'
+import { Alert, Empty, Timeline } from '@tezign/tezign-ui'
 import React, { useEffect } from 'react'
 
 const ImageHistory = () => {
@@ -11,10 +12,6 @@ const ImageHistory = () => {
     const { setInset, setImageSrc } = usePluginStore.getState()
 
     setImageSrc(url)
-    // file
-    // usePluginStore.setState({
-    //   imageFile: undefined
-    // })
     setInset(DEFAULT_INSET)
 
     const poster = document.getElementById('poster')
@@ -44,13 +41,33 @@ const ImageHistory = () => {
     setCurrent(imageHistory.length - 1)
   }, [imageHistory.length])
 
-  const timelines = imageHistory.map(({ timestamp, mode, src }, index) => {
+  const getDirLabel = (dir: ExtendPosition) => {
+    switch (dir) {
+      case 'center':
+        return '中心'
+      case 'toBottom':
+        return '向下'
+      case 'toLeft':
+        return '向左'
+      case 'toRight':
+        return '向右'
+      case 'toTop':
+        return '向上'
+      default:
+        return ''
+    }
+  }
+
+  const timelines = imageHistory.map(({ timestamp, mode, src, dir }, index) => {
     const isactive = index === current
     return (
       <Timeline.Item key={index} color={isactive ? 'green' : 'gray'}>
         <div className="flex flex-col gap-2">
           <div>
-            {mode} -- {new Date(timestamp).toLocaleString()}
+            {mode === 'extend'
+              ? `AI延展${dir ? '(' + getDirLabel(dir) + ')' : ''}`
+              : 'AI重绘'}{' '}
+            -- {new Date(timestamp).toLocaleString()}
           </div>
           <div className="flex flex-row">
             <img
@@ -68,7 +85,14 @@ const ImageHistory = () => {
   })
 
   return (
-    <div className="max-h-[320px] overflow-y-scroll py-2">
+    <div className="image-history -mr-3 max-h-[320px] overflow-y-scroll">
+      <Alert
+        message={'关闭插件后，历史记录不会继续保留。'}
+        type="warning"
+        closable
+        showIcon={true}
+      />
+      <div className="h-4" />
       {isEmpty ? (
         <Empty size="small" description="暂无历史" />
       ) : (

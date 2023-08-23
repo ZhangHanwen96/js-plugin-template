@@ -1,3 +1,5 @@
+import clamp from 'lodash/clamp'
+
 export const MIN_SIZE = 512
 export const MAX_SIZE = 2048
 
@@ -11,15 +13,15 @@ export const rescaleRect = (width: number, height: number) => {
   if (tooSmall) {
     const scaleRatio = MIN_SIZE / Math.min(width, height)
     return {
-      width: width * scaleRatio,
-      height: height * scaleRatio,
+      width: clamp(width * scaleRatio, MIN_SIZE, MAX_SIZE),
+      height: clamp(height * scaleRatio, MIN_SIZE, MAX_SIZE),
       scale: scaleRatio
     }
   }
   const scaleRatio = MAX_SIZE / Math.max(width, height)
   return {
-    width: width * scaleRatio,
-    height: height * scaleRatio,
+    width: clamp(width * scaleRatio, MIN_SIZE, MAX_SIZE),
+    height: clamp(height * scaleRatio, MIN_SIZE, MAX_SIZE),
     scale: scaleRatio
   }
 }

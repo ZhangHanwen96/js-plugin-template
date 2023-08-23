@@ -1,4 +1,5 @@
 import { Rect } from '@/interface'
+import { useExtraStore } from '@/store/extra'
 import React, { useRef } from 'react'
 
 export const useMouseSelect = ({ handleEnd }: { handleEnd: any }) => {
@@ -68,11 +69,18 @@ export const useMouseSelect = ({ handleEnd }: { handleEnd: any }) => {
     }
 
     const mouseUpHandler = () => {
+      // meaning no box select
+      if (!box) {
+        useExtraStore.setState({
+          boxSelectDivStyle: undefined
+        })
+      }
       isMoving.current = false
       handleEnd(rectRef.current as Rect)
 
       originMouseCords.current = { x: 0, y: 0 }
       box?.remove()
+      box = undefined
       rectRef.current = undefined
       document.removeEventListener('mousemove', mouseMoveHandler)
       document.removeEventListener('mouseup', mouseUpHandler)

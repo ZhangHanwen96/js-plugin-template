@@ -14,11 +14,12 @@ export const generateUpscaleAI = async (
   width: number,
   height: number
 ) => {
+  // 639 => 64n ceil -> 640
   const upscaleImage = new UpScaleImage(file, width, height, 'repeat')
-
+  // 512 x 512 -> 640 x 640
   const upscaleIns = await upscaleImage.returnParams()
   const { file: upscaleFile, ...extendsParam } = upscaleIns
-  // const upscaleFileIns = upscaleFile[0]
+
   console.log('upscaleIns params', upscaleIns)
   const images = await aiProxy({
     api: '/api/diffusion/generate',
@@ -27,8 +28,6 @@ export const generateUpscaleAI = async (
       ...extendsParam
     }
   } as any)
-
-  // const mime = getMimeTypeFromFileName(upscaleFileIns.name)
 
   const mime = file.type
   const ext = mime.split('/')[1]

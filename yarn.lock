@@ -3221,10 +3221,10 @@ js-yaml@^4.1.0:
   dependencies:
     argparse "^2.0.1"
 
-jsd-tezign-image@^1.2.2:
-  version "1.2.2"
-  resolved "https://registry.npmjs.org/jsd-tezign-image/-/jsd-tezign-image-1.2.2.tgz#9d4dce9c8b1a70d2b2737e8e84df2b3b0b4964e0"
-  integrity sha512-mxXOo/3I5BlS6euet25KE1I2qHfjePfaPFjNvS6+UxZJWsdjkY+Lg3mBG3AC3OhwydWaNdojYMtyoxcyKlaZzg==
+jsd-tezign-image@^1.2.3:
+  version "1.2.3"
+  resolved "https://registry.npmjs.org/jsd-tezign-image/-/jsd-tezign-image-1.2.3.tgz#8546379da1eaef28ae746168b109af76559b28a2"
+  integrity sha512-+VpIE6mteO19/bkVDXGApHm/AS4w0k7F14fjfBYKjkWUtv01LQ6zCd8InQ3I+9tfAXzkcZ2ziiC8OQZPSZo70Q==
   dependencies:
     terser-webpack-plugin "^5.3.9"
 

@@ -6,7 +6,7 @@ import { useMount } from 'ahooks'
 import { UploadOutlined, HistoryOutlined } from '@tezign/icons'
 
 import { Accept, useDropzone } from 'react-dropzone'
-import { delay, fileToUrl, postMessage } from '@/utils'
+import { delay, fileToUrl, getExtendDirection, postMessage } from '@/utils'
 import ImageList from '@/components/image-list'
 import { Alert, Button, Empty, Popover, Tabs, TzSpin } from '@tezign/tezign-ui'
 import { useExtraStore } from '@/store/extra'
@@ -124,6 +124,9 @@ const App: React.FC = () => {
     )
   })
 
+  const resetBoundary = usePluginStore.use.resetBoundary()
+  const setBoxSelectDivStyle = useExtraStore.use.setBoxSelectDivStyle()
+
   const {
     getRootProps,
     getInputProps,
@@ -131,8 +134,6 @@ const App: React.FC = () => {
     isDragAccept,
     isDragReject,
     open
-
-    // acceptedFiles
   } = useDropzone({
     accept: {
       ...image
@@ -144,6 +145,9 @@ const App: React.FC = () => {
     onDropAccepted(files) {
       if (!files.length) return
       handleImageUpload(files[0])
+      // reset all
+      setBoxSelectDivStyle(undefined)
+      resetBoundary()
     }
   })
 
@@ -196,6 +200,18 @@ const App: React.FC = () => {
       }
     }
   }
+
+  const inset = usePluginStore.use.inset()
+  const boxSelectDivStyle = useExtraStore.use.boxSelectDivStyle()
+  const loading = usePluginStore.use.loading()
+
+  const canGenerate = useMemo(() => {
+    if (tab === 'extend') {
+      return !!getExtendDirection()
+    }
+    return !!boxSelectDivStyle
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, inset, boxSelectDivStyle])
 
   return (
     <div>
@@ -258,7 +274,13 @@ const App: React.FC = () => {
         >
           <Button type="default" icon={<HistoryOutlined />}></Button>
         </Popover>
-        <Button onClick={generateDrawing}>生成</Button>
+        <Button
+          loading={loading}
+          disabled={!canGenerate}
+          onClick={generateDrawing}
+        >
+          生成
+        </Button>
       </div>
     </div>
   )

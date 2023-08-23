@@ -1,26 +1,15 @@
 import { usePluginStore } from '@/store'
 import { message } from '@tezign/tezign-ui'
 
-import { clamp } from 'lodash'
 import { generateExtendAI } from './ai/extend'
 import { generateUpscaleAI } from './ai/upscale'
 import { generateImage } from './ai/generate'
 import { cutImage } from './ai/cut'
 import { clipImage } from '@/utils/clipImage'
 import { getMimeTypeFromDataUrl } from '@/utils/mime'
-import { dataUrlToFile, downloadFile, postMessage } from '@/utils'
+import { downloadFile, getExtendDirection, postMessage } from '@/utils'
 import { rescaleRect } from '@/utils/scaleImage'
-
-const getExtendDirection = () => {
-  const { inset } = usePluginStore.getState()
-  console.log(inset)
-  for (const dir of ['top', 'bottom', 'left', 'right']) {
-    if (inset[dir]) {
-      return dir as 'top' | 'bottom' | 'left' | 'right'
-    }
-  }
-  return null
-}
+import { captureVisibleBackground } from '@/utils/captureVisibleBackground'
 
 export type ExtendPosition =
   | 'center'
@@ -61,7 +50,7 @@ export const extendImage = async (
     console.log('[extendImage start]')
     console.log('[extendImage generateExtendAI start]')
 
-    const extendsAIFile = await generateExtendAI(file)
+    const extendsAIFile = await generateExtendAI(file, position)
 
     console.log('[extendImage generateUpscaleAI start]', extendsAIFile)
 
@@ -76,7 +65,8 @@ export const extendImage = async (
         height,
         position
       )
-      const cutAIFile = await cutImage(genAIFile, width, height)
+
+      const cutAIFile = await cutImage(genAIFile, width, height, position)
       return cutAIFile
     })
 
@@ -105,8 +95,7 @@ export const getExtendImageSingleBase = async (
     quantity: number
   }
 ) => {
-  const extendsAIFile = await generateExtendAI(file)
-
+  const extendsAIFile = await generateExtendAI(file, position)
   console.log('[extendImage generateUpscaleAI start]', extendsAIFile)
 
   const upscaleAIFile = await generateUpscaleAI(extendsAIFile, width, height)
@@ -119,19 +108,27 @@ export const getExtendImageSingleBase = async (
   }
 }
 
-export const extendImageSingle = async ({
-  file,
-  height,
-  position,
-  width
-}: {
+export const extendImageSingle = async (params: {
   file: File
   width: number
   height: number
   position: ExtendPosition
 }) => {
-  const genAIFile = await generateImage(file, width, height, position)
-  const cutAIFile = await cutImage(genAIFile, width, height)
+  const { file, height, position, width } = params
+  console.log('[extendImageSingle] params:', params)
+  const genAIFile = await generateImage(
+    file,
+    Math.round(width),
+    Math.round(height),
+    position
+  )
+  downloadFile(genAIFile)
+  const cutAIFile = await cutImage(
+    genAIFile,
+    Math.round(width),
+    Math.round(height),
+    position
+  )
   return cutAIFile
 }
 
@@ -163,18 +160,25 @@ export const getExtendAIParam = async () => {
   console.log('[height]', rescaledRect.height)
 
   try {
-    const { uint8 } = await postMessage<{ uint8: Uint8Array }>({
-      type: 'viewportImage',
-      payload: {
-        width: rescaledImageRect.width,
-        height: rescaledImageRect.height
-      }
+    // HACK: mock cover image
+    const blob = await captureVisibleBackground({
+      height: rescaledImageRect.height,
+      width: rescaledImageRect.width,
+      mode: 'cover',
+      src: imageSrc
     })
+    // const { uint8 } = await postMessage<{ uint8: Uint8Array }>({
+    //   type: 'viewportImage',
+    //   payload: {
+    //     width: rescaledImageRect.width,
+    //     height: rescaledImageRect.height
+    //   }
+    // })
 
     console.log('[rescaledImageRect]', rescaledImageRect)
 
-    const blob = new Blob([uint8], { type: 'image/png' })
-    const file = new File([blob], 'rescaled-background.png', {
+    // const blob = new Blob([uint8], { type: 'image/png' })
+    const file = new File([blob], `rescaled-bg-${Date.now()}.png`, {
       type: 'image/png'
     })
 
@@ -192,7 +196,7 @@ export const getExtendAIParam = async () => {
       clipRect: undefined,
       height: rescaledImageRect.height,
       mimeType: getMimeTypeFromDataUrl(imageSrc),
-      name: 'scaled-background.png',
+      name: `fallback-rescaled-bg-${Date.now()}.png`,
       width: rescaledImageRect.width,
       src: imageSrc
     })
@@ -207,35 +211,3 @@ export const getExtendAIParam = async () => {
     }
   }
 }
-
-interface ExtendImageParams {
-  src: string
-  width: number
-  height: number
-  extendDirection: 'top' | 'bottom' | 'left' | 'right'
-}
-
-// export const extendImage = async ({
-//   extendDirection,
-//   height,
-//   src,
-//   width
-// }: ExtendImageParams) => {
-//   const response = await fetch(src)
-//   const blob = await response.blob()
-//   const file = new File([blob], 'background.png', { type: 'image/png' })
-
-//   console.log('[File]', file)
-
-//   const extendStep = new ExtendImage(
-//     file,
-//     width,
-//     height,
-//     'fill',
-//     `to${extendDirection.toUpperCase()}` as any
-//   )
-//   const params = await extendStep.returnParams()
-//   const images = await aiProxy({ params, api: '/api/diffusion/generate' })
-
-//   return images as string[]
-// }

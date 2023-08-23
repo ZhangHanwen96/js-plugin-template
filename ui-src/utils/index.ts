@@ -1,4 +1,4 @@
-import { eventPubsub } from '@/store'
+import { eventPubsub, usePluginStore } from '@/store'
 import { uuid } from './uuid'
 import { getMimeTypeFromDataUrl } from './mime'
 
@@ -78,4 +78,16 @@ export const downloadFile = async (file: File) => {
   document.body.appendChild(download) // Add it to the body
   download.click()
   document.body.removeChild(download) // Remove it afterwards
+}
+
+export const getExtendDirection = () => {
+  const { inset } = usePluginStore.getState()
+
+  for (const dir of ['top', 'bottom', 'left', 'right']) {
+    if (inset[dir]) {
+      return dir as 'top' | 'bottom' | 'left' | 'right'
+    }
+  }
+
+  return null
 }

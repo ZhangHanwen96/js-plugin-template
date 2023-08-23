@@ -3,15 +3,25 @@ import loadingGif from '@/assets/image-loading-sekelton.gif'
 import clx from 'classnames'
 import { ctx } from './ImageProvider'
 import { useMemoizedFn, useRequest } from 'ahooks'
-import { extendImage, extendImageSingle } from '@/service/extendImage'
-import { message } from '@tezign/tezign-ui'
-import { base64ToDataUrl, fileToUrl } from '@/utils'
+import { v4 as uuid } from 'uuid'
+import { ExtendPosition, extendImageSingle } from '@/service/extendImage'
+import { Popover, message } from '@tezign/tezign-ui'
+import {
+  base64ToDataUrl,
+  dataUrlToFile,
+  downloadFile,
+  fileToUrl
+} from '@/utils'
 import { partialRedraw } from '@/service/partialRedraw'
 import { Mode } from '@/interface'
 import { usePluginStore } from '@/store'
+import { WarningOutlined } from '@tezign/icons'
 
 interface AIImageProps {
-  onImageClick: (daraUrl: string, mode: Mode) => void
+  onImageClick: (
+    params: { dataUrl: string; mode: Mode; id: string },
+    dir?: ExtendPosition
+  ) => void
   index: number
   setLoading: (index: number, loading: boolean) => void
 }
@@ -24,7 +34,7 @@ const AIImage: FC<AIImageProps> = ({
   const { requestParams } = useContext(ctx)
   const [loading, setLoading] = useState(true)
   const [imageData, setImageData] = useState<
-    { dataUrl: string; mode: Mode } | undefined
+    { dataUrl: string; mode: Mode; id: string } | undefined
   >()
 
   const memoizedImageClick = useMemoizedFn(onImageClick)
@@ -41,9 +51,14 @@ const AIImage: FC<AIImageProps> = ({
     },
     onSuccess(data) {
       const image = data[0]
+      const dataUrl = base64ToDataUrl(image)
+
+      dataUrlToFile(dataUrl, `partial-${Date.now()}`).then(downloadFile)
+
       setImageData({
-        dataUrl: base64ToDataUrl(image),
-        mode: 'partialRedraw'
+        dataUrl: dataUrl,
+        mode: 'partialRedraw',
+        id: uuid()
       })
     },
     onError() {
@@ -61,7 +76,8 @@ const AIImage: FC<AIImageProps> = ({
       const dataUrl = await fileToUrl(response)
       const data = {
         dataUrl: dataUrl,
-        mode: 'extend' as Mode
+        mode: 'extend' as Mode,
+        id: uuid()
       }
       setImageData(data)
     },
@@ -80,6 +96,9 @@ const AIImage: FC<AIImageProps> = ({
       return
     }
     setImageData(undefined)
+
+    console.log('requestParams', requestParams)
+
     if (requestParams.mode === 'extend') {
       runAIExtend(requestParams.params)
     } else {
@@ -100,27 +119,54 @@ const AIImage: FC<AIImageProps> = ({
         selected && 'ring-2 ring-[#008EFA] ring-offset'
       )}
       onClick={() => {
-        if (loading || error || !imageData?.dataUrl) return
-        memoizedImageClick(imageData?.dataUrl, imageData?.mode)
+        if (loading || error || !imageData?.dataUrl || selected) return
+        memoizedImageClick(
+          imageData,
+          (requestParams.params?.position ?? undefined) as ExtendPosition
+        )
       }}
     >
       {error ? (
         <div
           className={clx(
-            'h-16 w-full flex items-center justify-center text-red-500 font-semibold'
+            'h-16 w-full flex items-center justify-center text-[var(--color-danger)] bg-[#FFF2F2]'
           )}
         >
-          <span>生成失败!</span>
+          <WarningOutlined />
+          <span className="ml-1">生成失败</span>
         </div>
-      ) : (
+      ) : loading ? (
         <img
-          src={loading ? loadingGif : imageData?.dataUrl}
+          src={loadingGif}
           crossOrigin="anonymous"
           className={clx(
             'h-16 w-full',
             loading ? 'object-scale-down' : 'object-scale-down'
           )}
         />
+      ) : (
+        <Popover
+          mouseEnterDelay={0.5}
+          content={
+            <img
+              src={imageData?.dataUrl}
+              crossOrigin="anonymous"
+              className={clx(
+                'h-60 w-full',
+                loading ? 'object-scale-down' : 'object-scale-down'
+              )}
+            />
+          }
+        >
+          <img
+            src={imageData?.dataUrl}
+            crossOrigin="anonymous"
+            className={clx(
+              'h-16 w-full',
+              loading ? 'object-scale-down' : 'object-scale-down'
+            )}
+          />
+        </Popover>
       )}
     </div>
   )

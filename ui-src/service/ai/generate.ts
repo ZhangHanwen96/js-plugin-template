@@ -14,6 +14,8 @@ export const generateImage = async (
   height: number,
   position: 'center' | 'toTop' | 'toBottom' | 'toLeft' | 'toRight'
 ) => {
+  // 640 x 640
+  // 639 -> 640 x 910 -> 920
   const genImage = new GenerateImage(file, width, height, position)
 
   const genIns = await genImage.returnParams()
@@ -22,15 +24,10 @@ export const generateImage = async (
 
   const mime = genFileIns.type
   const ext = mime.split('/')[1]
-  // const mime = getMimeTypeFromFileName(genFileIns.mim)
-  // const files = genFile.map((f) => {
-  //   return new File([f], 'tszign.png', {
-  //     type: f.type,
-  //     lastModified: f.lastModified
-  //   })
-  // })
-  // genIns.file = files
-  console.log('gererateImage param', genIns)
+  console.log('gererateImage param', genIns, {
+    width,
+    height
+  })
 
   const images = await aiProxy({
     params: {

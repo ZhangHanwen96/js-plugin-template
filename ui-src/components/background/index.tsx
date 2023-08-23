@@ -65,7 +65,7 @@ const Background = () => {
   const boxSelectDivStyle = useExtraStore.use.boxSelectDivStyle?.()
   const setBoxSelectDivStyle = useExtraStore.use.setBoxSelectDivStyle()
 
-  console.log('[Rect Box]:', rectBox)
+  // console.log('[Rect Box]:', rectBox)
   // console.log('[boxSelectDivStyle]', boxSelectDivStyle)
 
   /**
@@ -523,7 +523,7 @@ const Background = () => {
           left: '10px',
           right: '10px',
           height: `${size}px`,
-          cursor: cursors[dir]
+          cursor: 'ns-resize'
         } as React.CSSProperties
       }
       return {
@@ -532,16 +532,18 @@ const Background = () => {
         top: '10px',
         bottom: '10px',
         width: `${size}px`,
-        cursor: cursors[dir]
-      }
+        cursor: 'ew-resize'
+      } as React.CSSProperties
     }
     const style = getCursorStyle(dir as any)
 
     return (
       <div
         className={clx(
-          'resize-handler absolute bg-[var(--color-primary)]',
-          isCurrentActive && 'bg-sky-600'
+          'resize-handler absolute hover:bg-opacity-100 rounded-sm',
+          isCurrentActive
+            ? 'bg-sky-600 bg-opacity-100'
+            : 'bg-[#0cc5ae] bg-opacity-40'
         )}
         dir={dir}
         style={{

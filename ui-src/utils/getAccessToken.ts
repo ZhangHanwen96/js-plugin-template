@@ -13,7 +13,6 @@ const isExpired = (timestamp: number) => {
 const _getAccessToken = async () => {
   try {
     const res = await fetchAccessToken()
-    console.log('[res]', res)
     accessToken = res.accessToken
     expiredAt = res.expireAt
     const q = resolveQ.splice(0)

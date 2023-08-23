@@ -1,12 +1,12 @@
 import { rectBoxRef, usePluginStore } from '@/store'
-import { ClipImageParams, clipImage } from '@/utils/clipImage'
-// import { getBoxselectPercentageRect } from '@/utils/position'
+import { clipImage } from '@/utils/clipImage'
 import { AIProxyParams, aiProxy } from './aiProxy'
 import { useExtraStore } from '@/store/extra'
 import { absolutePositionToPercent } from '@/utils/position'
 import { getMimeTypeFromDataUrl } from '@/utils/mime'
 import { rescaleRect } from '@/utils/scaleImage'
-import { downloadFile, fileToUrl, postMessage } from '@/utils'
+import { downloadFile, fileToUrl } from '@/utils'
+import { captureVisibleBackground } from '@/utils/captureVisibleBackground'
 
 const getBoxselectPercentageRect = () => {
   const rect = useExtraStore.getState().boxSelectDivStyle
@@ -61,22 +61,33 @@ export const getPartialRedrawParams = async () => {
   console.log('rescaledRect', rescaledRect)
 
   try {
-    const { uint8 } = await postMessage<{ uint8: Uint8Array }>({
-      type: 'viewportImage',
-      payload: {
-        width,
-        height
-      }
+    // HACK: mock cover image
+    const blob = await captureVisibleBackground({
+      height,
+      width,
+      mode: 'cover',
+      src: _imageSrc
     })
 
-    const rescaledPartialBlob = new Blob([uint8], { type: 'image/png' })
+    // HACK: get from jsDesign
+    // const { uint8 } = await postMessage<{ uint8: Uint8Array }>({
+    //   type: 'viewportImage',
+    //   payload: {
+    //     width,
+    //     height
+    //   }
+    // })
+    // const rescaledPartialBlob = new Blob([uint8], { type: 'image/png' })
+
     const rescaledPartialFile = new File(
-      [rescaledPartialBlob],
-      'rescaled-partial-background.png',
+      [blob],
+      `rescaled-bg-${Date.now()}.png`,
       {
         type: 'image/png'
       }
     )
+
+    // downloadFile(rescaledPartialFile)
 
     const imageSrc = await fileToUrl(rescaledPartialFile)
     const param = {
@@ -94,31 +105,31 @@ export const getPartialRedrawParams = async () => {
 
     const mimeType = getMimeTypeFromDataUrl(imageSrc)
     const ext = mimeType.split('/')[1]
-    const partialFile = await clipImage({
+    const maskFile = await clipImage({
       ...param,
       mimeType,
-      name: `clip-bg.${ext}`
+      name: `mask-bg-${Date.now()}.${ext}`
     })
 
-    downloadFile(partialFile)
+    downloadFile(maskFile)
 
     return {
-      files: [rescaledPartialFile, partialFile],
+      files: [rescaledPartialFile, maskFile],
       api: '/api/diffusion/generate',
       params: {
         model: 'sd-v1-5-pruned-emaonly',
         model_variant: 'inpainting',
         image: '0',
         mask: '1',
-        height,
-        width,
+        // must be string
+        height: Math.round(height) + '',
+        width: Math.round(width) + '',
         strength: '0.95'
       }
     }
   } catch (error) {
     console.error(error)
     // TODO: scale with UpscaleAI
-
     const height = rectBox.height / scale
     const width = rectBox.width / scale
     const param = {
@@ -139,13 +150,15 @@ export const getPartialRedrawParams = async () => {
     const partialFile = await clipImage({
       ...param,
       mimeType,
-      name: `clip-bg.${ext}`
+      name: `mask-bg-${Date.now()}.${ext}`
     })
 
     downloadFile(partialFile)
 
     const blob = await fetch(_imageSrc).then((res) => res.blob())
-    const file = new File([blob], `background.${ext}`, { type: mimeType })
+    const file = new File([blob], `fallback-rescaled-bg-${Date.now()}.${ext}`, {
+      type: mimeType
+    })
 
     return {
       files: [file, partialFile],
@@ -155,8 +168,9 @@ export const getPartialRedrawParams = async () => {
         model_variant: 'inpainting',
         image: '0',
         mask: '1',
-        height,
-        width,
+        // must be string
+        height: Math.round(height) + '',
+        width: Math.round(width) + '',
         strength: '0.95'
       }
     }

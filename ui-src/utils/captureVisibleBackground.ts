@@ -9,6 +9,7 @@ export function captureVisibleBackground({
   height: number
   mode: 'cover' | 'contain'
 }) {
+  const dpr = window.devicePixelRatio || 1
   const divWidth = width
   const divHeight = height
   const divRatio = divWidth / divHeight
@@ -16,14 +17,17 @@ export function captureVisibleBackground({
   const img = new Image()
   img.src = src
 
-  return new Promise((resolve, reject) => {
+  return new Promise<Blob>((resolve, reject) => {
     img.onload = function () {
       const imgWidth = img.width
       const imgHeight = img.height
       const imgRatio = imgWidth / imgHeight
-      const dpr = window.devicePixelRatio || 1
 
       let sourceX, sourceY, sourceWidth, sourceHeight
+      let destX = 0,
+        destY = 0,
+        destWidth = divWidth,
+        destHeight = divHeight
 
       if (mode === 'cover') {
         if (imgRatio > divRatio) {
@@ -43,15 +47,21 @@ export function captureVisibleBackground({
         if (imgRatio > divRatio) {
           const scale = divWidth / imgWidth
           sourceWidth = imgWidth
-          sourceHeight = divHeight / scale
+          sourceHeight = imgHeight
           sourceX = 0
-          sourceY = (imgHeight - sourceHeight) / 2
+          sourceY = 0
+
+          destHeight = imgHeight * scale
+          destY = (divHeight - imgHeight * scale) / 2
         } else {
           const scale = divHeight / imgHeight
-          sourceWidth = divWidth / scale
+          sourceWidth = imgWidth
           sourceHeight = imgHeight
-          sourceX = (imgWidth - sourceWidth) / 2
+          sourceX = 0
           sourceY = 0
+
+          destWidth = imgWidth * scale
+          destX = (divWidth - imgWidth * scale) / 2
         }
       }
 
@@ -61,13 +71,18 @@ export function captureVisibleBackground({
       canvas.style.width = divWidth + 'px'
       canvas.style.height = divHeight + 'px'
       const ctx = canvas.getContext('2d')
-      ctx.scale(dpr, dpr)
+      ctx.scale(1 / dpr, 1 / dpr)
+
       ctx.drawImage(
         img,
-        sourceX / dpr,
-        sourceY / dpr,
-        sourceWidth / dpr,
-        sourceHeight / dpr
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        destX * dpr,
+        destY * dpr,
+        destWidth * dpr,
+        destHeight * dpr
       )
 
       canvas.toBlob((blob) => {

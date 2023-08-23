@@ -156,7 +156,9 @@ const getInitData = (
       y: toFixed2(imageWrapperRect.y * scale)
     }
   }
-  // console.log(result, 'result')
+
+  rectBoxRef.current = result.rectBox
+
   return result
 }
 
@@ -399,7 +401,10 @@ const _pluginStore = create(
         addImageHistory(urls) {
           set((state) => {
             if (urls) {
-              state.imageHistory.push(...urls)
+              const filteredUrls = urls.filter((url) => {
+                return !state.imageHistory.find((item) => item.id === url.id)
+              })
+              state.imageHistory.push(...filteredUrls)
             } else {
               state.imageHistory.splice(0)
             }

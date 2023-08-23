@@ -1,3 +1,5 @@
+import { ExtendPosition } from '@/service/extendImage'
+
 export interface Rect {
   x: number
   y: number
@@ -11,4 +13,6 @@ export interface HistoryRecord {
   timestamp: number
   mode: Mode
   src: string
+  dir?: ExtendPosition
+  id: string
 }
